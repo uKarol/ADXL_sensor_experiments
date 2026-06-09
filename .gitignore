@@ -53,3 +53,8 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+#directories with generated code
+connection_with_ADXL345/Debug/
+connection_with_ADXL345/Drivers/
+
