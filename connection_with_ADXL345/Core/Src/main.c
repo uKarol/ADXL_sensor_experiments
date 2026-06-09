@@ -25,6 +25,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stdio.h"
+#include "ADXL_driver.h"
+#include "MeasurementFSM.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -56,118 +58,6 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define READOUT_NUM 100
-
-#define ADEXL_ID (0x53U<<1U)
-
-
-#define DATAX0_REG 0x32
-#define DATAX1_REG 0x33
-#define DATAY0_REG 0x34
-#define DATAY1_REG 0x35
-#define DATAZ0_REG 0x36
-#define DATAZ1_REG 0x37
-
-#define DATA_FORMAT_REG 0x31
-#define BW_RATE_REG 0x2C
-
-// adxl registers
-#define DEVID 0x00
-#define POWER_CTL 0x2D
-
-// adxl bits
-#define POWER_CTL_MEASURE 1<<3
-
-typedef enum
-{
-	ADXL_SUCCESS,
-	ADXL_FAILURE
-}ADXL_status_t;
-
-ADXL_status_t ADXL_ReadReg(uint8_t reg_id, uint8_t *pValueOut, uint8_t valueSize)
-{
-	ADXL_status_t ret_val = ADXL_FAILURE;
-	if(HAL_I2C_Master_Transmit(&hi2c1, ADEXL_ID, &reg_id, 1, 100) == HAL_OK)
-	{
-		if(HAL_I2C_Master_Receive(&hi2c1, ADEXL_ID, pValueOut, valueSize, 100) == HAL_OK)
-		{
-			ret_val = ADXL_SUCCESS;
-		}
-	}
-	return ret_val;
-}
-
-ADXL_status_t ADXL_WriteReg(uint8_t reg_id, uint8_t *DataIn, uint8_t DataSize)
-{
-	ADXL_status_t ret_val = ADXL_FAILURE;
-	if(HAL_I2C_Mem_Write(&hi2c1, ADEXL_ID, reg_id, 1, DataIn, DataSize, 100) == HAL_OK)
-	{
-		ret_val = ADXL_SUCCESS;
-	}
-	return ret_val;
-}
-
-
-ADXL_status_t ADXL_init_default()
-{
-	ADXL_status_t ret_val = ADXL_FAILURE;
-	HAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_SET); // set CS to 1
-	HAL_GPIO_WritePin(SDO_GPIO_Port, SDO_Pin, GPIO_PIN_RESET);
-
-	if (HAL_I2C_IsDeviceReady(&hi2c1, ADEXL_ID, 5, 100) == HAL_OK)
-	{
-		uint8_t i2c_send_data = POWER_CTL_MEASURE;
-		uint8_t i2c_rec_data;
-		if( ADXL_ReadReg(DEVID, &i2c_rec_data, 1) == ADXL_SUCCESS )
-		{
-			if( ADXL_WriteReg(POWER_CTL, &i2c_send_data, 1) == ADXL_SUCCESS )
-			{
-				if( ADXL_ReadReg(POWER_CTL, &i2c_rec_data, 1) == ADXL_SUCCESS )
-				{
-					ret_val = ADXL_SUCCESS;
-				}
-			}
-		}
-	}
-	return ret_val;
-}
-
-
-ADXL_status_t ADXL_ReadData(int16_t *Xdata, int16_t *Ydata, int16_t *Zdata)
-{
-	int fail_ctr;
-	ADXL_status_t ret_val = ADXL_FAILURE;
-
-	uint8_t all_regs[6];
-	HAL_StatusTypeDef state = HAL_I2C_Mem_Read(&hi2c1, ADEXL_ID, DATAX0_REG, 1, all_regs, 6, 1000);
-	if( HAL_OK == state)
-	{
-		*Xdata = (int16_t)(all_regs[1]<<8)|(all_regs[0]);
-		*Ydata = (int16_t)(all_regs[3]<<8)|(all_regs[2]);
-		*Zdata = (int16_t)(all_regs[5]<<8)|(all_regs[4]);
-		ret_val = ADXL_SUCCESS;
-	}
-
- 	return ret_val;
-}
-
-
-typedef enum
-{
-	MEASURE_WAITING,
-	MEASURE_PROCESSING,
-	MEASURE_ERROR
-}measurement_state_t;
-
-typedef enum
-{
-	ADXL_NO_ERROR,
-	ADXL_INIT_FAILURE,
-	ADXL_READ_FAILURE,
-}measurement_error_t;
-
-#define UART_RX_MAX_SIZE 20
-#define UART_TX_MAX_SIZE 20
 
 /* USER CODE END 0 */
 
@@ -178,8 +68,8 @@ typedef enum
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-	measurement_error_t current_error = ADXL_NO_ERROR;
-	uint8_t measure_ctr = 0;
+  MeasurementFSM_context_t measure_ctx;
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -209,70 +99,13 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-  int16_t Xdata;
-  int16_t Ydata;
-  int16_t Zdata;
 
-  uint8_t uart_data_in[UART_RX_MAX_SIZE];
-  uint8_t uart_data_out[UART_TX_MAX_SIZE];
-
-  measurement_state_t current_state = MEASURE_WAITING;
-
-
-
-  if( ADXL_init_default() == ADXL_SUCCESS )
-  {
-	  current_state = MEASURE_WAITING;
-  }
-  else
-  {
-	  current_state = MEASURE_ERROR;
-	  current_error = ADXL_INIT_FAILURE;
-  }
+  MeasurementFSM_setup(&measure_ctx);
 
   while (1)
   {
     /* USER CODE END WHILE */
-
-	  switch(current_state)
-	  {
-		  case MEASURE_PROCESSING:
-			  if( ADXL_ReadData(&Xdata, &Ydata, &Zdata) == ADXL_SUCCESS)
-			  {
-				  measure_ctr++;
-				  sprintf((char*)uart_data_out, "OK, %3d, %3d, %3d\n\r", Xdata, Ydata, Zdata);
-				  HAL_UART_Transmit(&hlpuart1, uart_data_out, 20, 100);
-				  if(measure_ctr >= READOUT_NUM)
-				  {
-					  measure_ctr = 0;
-					  current_state = MEASURE_WAITING;
-				  }
-			  }
-			  else
-			  {
-				  current_state = MEASURE_ERROR;
-				  current_error = ADXL_READ_FAILURE;
-			  }
-			  break;
-
-		  case MEASURE_WAITING:
-			  if(HAL_UART_Receive(&hlpuart1, &uart_data_in, 1, 10) == HAL_OK )
-			  {
-				  if(uart_data_in[0] == 0x55)
-				  {
-					  current_state = MEASURE_PROCESSING;
-				  }
-			  }
-			  break;
-		  case MEASURE_ERROR:
-			  sprintf((char*)uart_data_out, "ERROR, %d\n", current_error);
-			  HAL_UART_Transmit(&hlpuart1, uart_data_out, sizeof(uart_data_out), 100);
-			  break;
-		  default:
-			  /* shall never occure */
-			  break;
-
-	  }
+	  MeasurementFSM_run(&measure_ctx);
 	  HAL_Delay(10);
     /* USER CODE BEGIN 3 */
   }
