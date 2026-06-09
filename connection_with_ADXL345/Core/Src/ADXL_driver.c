@@ -9,7 +9,8 @@
 
 #include "i2c.h"
 
-#define DEVID 0U
+#define DEV_ID_REG 0U
+#define DEV_ID 0xE5
 
 static ADXL_status_t ADXL_ReadReg(uint8_t reg_id, uint8_t *pValueOut, uint8_t valueSize);
 static ADXL_status_t ADXL_WriteReg(uint8_t reg_id, uint8_t *DataIn, uint8_t DataSize);
@@ -50,13 +51,16 @@ ADXL_status_t ADXL_init_default(void)
 	{
 		uint8_t i2c_send_data = POWER_CTL_MEASURE;
 		uint8_t i2c_rec_data;
-		if( ADXL_ReadReg(DEVID, &i2c_rec_data, 1) == ADXL_SUCCESS )
+		if( ADXL_ReadReg(DEV_ID_REG, &i2c_rec_data, 1) == ADXL_SUCCESS )
 		{
-			if( ADXL_WriteReg(POWER_CTL, &i2c_send_data, 1) == ADXL_SUCCESS )
+			if(i2c_rec_data == DEV_ID)
 			{
-				if( ADXL_ReadReg(POWER_CTL, &i2c_rec_data, 1) == ADXL_SUCCESS )
+				if( ADXL_WriteReg(POWER_CTL, &i2c_send_data, 1) == ADXL_SUCCESS )
 				{
-					ret_val = ADXL_SUCCESS;
+					if( ADXL_ReadReg(POWER_CTL, &i2c_rec_data, 1) == ADXL_SUCCESS )
+					{
+						ret_val = ADXL_SUCCESS;
+					}
 				}
 			}
 		}
