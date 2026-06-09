@@ -7,14 +7,9 @@
 
 #include "MeasurementFSM.h"
 #include "ADXL_driver.h"
-#include "usart.h"
-#include <stdio.h>
+#include "UART_Communication.h"
 
 #define READOUT_NUM 100
-
-#define UART_RX_MAX_SIZE 20
-#define UART_TX_MAX_SIZE 20
-
 
 void MeasurementFSM_setup(MeasurementFSM_context_t *context)
 {
@@ -38,17 +33,13 @@ void MeasurementFSM_run(MeasurementFSM_context_t *context)
 	int16_t Ydata;
 	int16_t Zdata;
 
-	uint8_t uart_data_in[UART_RX_MAX_SIZE];
-	uint8_t uart_data_out[UART_TX_MAX_SIZE];
-
 	switch(context->current_state)
 	{
 		case MEASURE_PROCESSING:
 			if( ADXL_ReadData(&Xdata, &Ydata, &Zdata) == ADXL_SUCCESS)
 			{
 				context->measure_ctr++;
-				sprintf((char*)uart_data_out, "OK, %3d, %3d, %3d\n\r", Xdata, Ydata, Zdata);
-				HAL_UART_Transmit(&hlpuart1, uart_data_out, 20, 100);
+				UART_Com_TransmitData(Xdata, Ydata, Zdata);
 				if(context->measure_ctr >= READOUT_NUM)
 				{
 					context->measure_ctr = 0;
@@ -63,18 +54,14 @@ void MeasurementFSM_run(MeasurementFSM_context_t *context)
 			break;
 
 		 case MEASURE_WAITING:
-			if(HAL_UART_Receive(&hlpuart1, &uart_data_in, 1, 10) == HAL_OK )
+			if( UART_Com_CheckStartSignal() == RECPETION_OK )
 			{
-				if(uart_data_in[0] == 0x55)
-				{
-					context->current_state = MEASURE_PROCESSING;
-				}
+				context->current_state = MEASURE_PROCESSING;
 			}
 			break;
 
 		 case MEASURE_ERROR:
-			sprintf((char*)uart_data_out, "ERROR, %d\n", context->current_error);
-			HAL_UART_Transmit(&hlpuart1, uart_data_out, sizeof(uart_data_out), 100);
+			UART_Com_TransmitError(context->current_error);
 			break;
 
 		default:
