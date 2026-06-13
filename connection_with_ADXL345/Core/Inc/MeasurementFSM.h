@@ -13,6 +13,7 @@
 typedef enum
 {
 	MEASURE_WAITING,
+	MEASURE_GET_SIZE,
 	MEASURE_PROCESSING,
 	MEASURE_ERROR
 }measurement_state_t;
@@ -27,7 +28,8 @@ typedef enum
 typedef struct
 {
 	measurement_error_t current_error;
-	uint8_t measure_ctr;
+	uint16_t measure_ctr;
+	uint16_t expected_size;
 	measurement_state_t current_state;
 }MeasurementFSM_context_t;
 

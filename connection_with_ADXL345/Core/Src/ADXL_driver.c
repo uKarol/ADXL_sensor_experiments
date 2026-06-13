@@ -68,6 +68,10 @@ ADXL_status_t ADXL_init_default(void)
 	return ret_val;
 }
 
+ADXL_status_t ADXL_GetConfig(int8_t *Xdata, int8_t *Ydata, int8_t *Zdata)
+{
+
+}
 
 ADXL_status_t ADXL_ReadData(int16_t *Xdata, int16_t *Ydata, int16_t *Zdata)
 {

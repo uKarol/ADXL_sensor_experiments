@@ -7,6 +7,7 @@
 #include "UART_Communication.h"
 #include "usart.h"
 #include <stdio.h>
+#include <string.h>
 
 #define START_SIGNAL 0x55
 #define UART_RX_MAX_SIZE 64
@@ -24,6 +25,16 @@ TransmissionStatus_t UART_Com_TransmitData(int16_t Xdata, int16_t Ydata, int16_t
 	return ret_val;
 }
 
+TransmissionStatus_t UART_Com_TransmitString(uint8_t *str)
+{
+	TransmissionStatus_t ret_val = TRANSMIT_FAILURE;
+	if( HAL_UART_Transmit(&hlpuart1, str, strlen(str), 100) != HAL_OK )
+	{
+		ret_val = TRANSMIT_OK;
+	}
+	return ret_val;
+}
+
 TransmissionStatus_t UART_Com_TransmitError(uint16_t ErrorCode)
 {
 	TransmissionStatus_t ret_val = TRANSMIT_FAILURE;
@@ -32,6 +43,28 @@ TransmissionStatus_t UART_Com_TransmitError(uint16_t ErrorCode)
 	if(HAL_UART_Transmit(&hlpuart1, uart_data_out, len_str, 100) == HAL_OK)
 	{
 		ret_val = TRANSMIT_OK;
+	}
+	return ret_val;
+}
+
+uint8_t uart_read_byte(UART_HandleTypeDef *huart)
+{
+	while(!(huart->Instance->ISR & USART_ISR_RXNE));
+	return huart->Instance->RDR;
+}
+
+ReceptionStatus_t UART_Com_GetSize(uint16_t *size)
+{
+	uint8_t uart_data_in[2];
+	ReceptionStatus_t ret_val = RECEPTION_FAILURE;
+
+	HAL_StatusTypeDef hal_ret = HAL_UART_Receive(&hlpuart1, uart_data_in, 2, 2000);
+	if( hal_ret == HAL_OK )
+	{
+//	uart_data_in[0] = uart_read_byte(&hlpuart1);
+//	uart_data_in[1] = uart_read_byte(&hlpuart1);
+		*size = ((uint16_t)uart_data_in[0])<<8 | uart_data_in[1];
+		ret_val = RECPETION_OK;
 	}
 	return ret_val;
 }

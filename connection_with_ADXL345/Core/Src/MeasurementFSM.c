@@ -40,7 +40,7 @@ void MeasurementFSM_run(MeasurementFSM_context_t *context)
 			{
 				context->measure_ctr++;
 				UART_Com_TransmitData(Xdata, Ydata, Zdata);
-				if(context->measure_ctr >= READOUT_NUM)
+				if(context->measure_ctr >= context->expected_size)
 				{
 					context->measure_ctr = 0;
 					context->current_state = MEASURE_WAITING;
@@ -56,9 +56,23 @@ void MeasurementFSM_run(MeasurementFSM_context_t *context)
 		 case MEASURE_WAITING:
 			if( UART_Com_CheckStartSignal() == RECPETION_OK )
 			{
-				context->current_state = MEASURE_PROCESSING;
+				context->current_state = MEASURE_GET_SIZE;
 			}
 			break;
+
+		 case MEASURE_GET_SIZE:
+			 uint16_t number_of_samples = 0;
+			 UART_Com_TransmitString("START");
+			 if( UART_Com_GetSize(&number_of_samples) == RECPETION_OK)
+			 {
+				 context->expected_size = number_of_samples;
+			 }
+			 else
+			 {
+				 context->expected_size = 100;
+			 }
+			 context->current_state = MEASURE_PROCESSING;
+		break;
 
 		 case MEASURE_ERROR:
 			UART_Com_TransmitError(context->current_error);
