@@ -13,9 +13,17 @@
 #define DEV_ID_REG 0U
 #define DEV_ID 0xE5
 
+#define REG_READ_NO 6
+#define TEMP_STR_SIZE 20
+
+typedef struct
+{
+	uint8_t reg_addr;
+	const char *reg_name;
+}RegDesc_t;
+
 static ADXL_status_t ADXL_ReadReg(uint8_t reg_id, uint8_t *pValueOut, uint8_t valueSize);
 static ADXL_status_t ADXL_WriteReg(uint8_t reg_id, uint8_t *DataIn, uint8_t DataSize);
-
 
 ADXL_status_t ADXL_ReadReg(uint8_t reg_id, uint8_t *pValueOut, uint8_t valueSize)
 {
@@ -69,25 +77,27 @@ ADXL_status_t ADXL_init_default(void)
 	return ret_val;
 }
 
-#define REG_READ_NO 6
 
-#define OFSX_REG 0x1E
-#define OFSY_REG 0x1F
-#define OFSZ_REG 0x20
-
-ADXL_status_t ADXL_GetConfig(uint8_t *readout)
+ADXL_status_t ADXL_GetConfig(char *readout, uint16_t max_size)
 {
 	ADXL_status_t ret_val = ADXL_SUCCESS;
-	uint8_t regs[REG_READ_NO] = {DATA_FORMAT_REG, BW_RATE_REG, POWER_CTL, OFSX_REG, OFSY_REG, OFSZ_REG};
-	char *reg_names[6] = {"DATA_FORMAT", "BW_RATE", "POWER_CTL", "OFSX", "OFSY", "OFSZ"};
+	size_t offset = 0;
+	const RegDesc_t ReadoutRegs[REG_READ_NO] =
+	{
+			{DATA_FORMAT_REG, "DATA_FORMAT"},
+			{BW_RATE_REG, "BW_RATE"},
+			{POWER_CTL, "POWER_CTL"},
+			{OFSX_REG, "OFSX"},
+			{OFSY_REG, "OFSY"},
+			{OFSZ_REG, "OFSZ"}
+	};
+
 	for(uint8_t i = 0; i<REG_READ_NO; i++)
 	{
-		char temp[20] = "";
 		uint8_t temp_val;
-		if( ADXL_ReadReg(regs[i], &temp_val, 1) == ADXL_SUCCESS )
+		if( ADXL_ReadReg(ReadoutRegs[i].reg_addr, &temp_val, 1) == ADXL_SUCCESS )
 		{
-			snprintf(temp, 20, "%s %d\n",reg_names[i], temp_val);
-			strcat(readout, temp);
+			offset += snprintf(&(readout[offset]), max_size-offset, "%s %d\n", ReadoutRegs[i].reg_name, temp_val);
 		}
 		else
 		{

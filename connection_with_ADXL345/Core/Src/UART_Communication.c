@@ -25,7 +25,7 @@ TransmissionStatus_t UART_Com_TransmitData(int16_t Xdata, int16_t Ydata, int16_t
 	return ret_val;
 }
 
-TransmissionStatus_t UART_Com_TransmitString(uint8_t *str)
+TransmissionStatus_t UART_Com_TransmitString(char *str)
 {
 	TransmissionStatus_t ret_val = TRANSMIT_FAILURE;
 	if( HAL_UART_Transmit(&hlpuart1, str, strlen(str), 100) != HAL_OK )

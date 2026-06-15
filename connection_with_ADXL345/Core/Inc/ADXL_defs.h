@@ -16,7 +16,9 @@
 #define DATAY1_REG 0x35U
 #define DATAZ0_REG 0x36U
 #define DATAZ1_REG 0x37U
-
+#define OFSX_REG 0x1E
+#define OFSY_REG 0x1F
+#define OFSZ_REG 0x20
 #define DATA_FORMAT_REG 0x31U
 #define BW_RATE_REG 0x2CU
 

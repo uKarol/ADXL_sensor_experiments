@@ -29,5 +29,6 @@ TransmissionStatus_t UART_Com_TransmitData(int16_t Xdata, int16_t Ydata, int16_t
 TransmissionStatus_t UART_Com_TransmitError(uint16_t ErrorCode);
 ReceptionStatus_t UART_Com_CheckStartSignal(uint8_t *sig_out);
 ReceptionStatus_t UART_Com_GetSize(uint16_t *size);
+TransmissionStatus_t UART_Com_TransmitString(char *str);
 
 #endif /* INC_UART_COMMUNICATION_H_ */

@@ -64,7 +64,7 @@ void MeasurementFSM_run(MeasurementFSM_context_t *context)
 				else if(sig == GET_CFG_SIGNAL)
 				{
 					char readout[150] = "";
-					ADXL_GetConfig(readout);
+					ADXL_GetConfig(readout, 150);
 					UART_Com_TransmitString(readout);
 				}
 			}
