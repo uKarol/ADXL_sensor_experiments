@@ -18,5 +18,5 @@ typedef enum
 
 ADXL_status_t ADXL_init_default();
 ADXL_status_t ADXL_ReadData(int16_t *Xdata, int16_t *Ydata, int16_t *Zdata);
-
+ADXL_status_t ADXL_GetConfig(uint8_t *readout);
 #endif /* INC_ADXL_DRIVER_H_ */

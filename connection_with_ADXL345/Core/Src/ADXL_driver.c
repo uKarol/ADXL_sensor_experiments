@@ -6,8 +6,9 @@
  */
 #include "ADXL_defs.h"
 #include "ADXL_driver.h"
-
+#include "string.h"
 #include "i2c.h"
+#include <stdio.h>
 
 #define DEV_ID_REG 0U
 #define DEV_ID 0xE5
@@ -68,9 +69,33 @@ ADXL_status_t ADXL_init_default(void)
 	return ret_val;
 }
 
-ADXL_status_t ADXL_GetConfig(int8_t *Xdata, int8_t *Ydata, int8_t *Zdata)
-{
+#define REG_READ_NO 6
 
+#define OFSX_REG 0x1E
+#define OFSY_REG 0x1F
+#define OFSZ_REG 0x20
+
+ADXL_status_t ADXL_GetConfig(uint8_t *readout)
+{
+	ADXL_status_t ret_val = ADXL_SUCCESS;
+	uint8_t regs[REG_READ_NO] = {DATA_FORMAT_REG, BW_RATE_REG, POWER_CTL, OFSX_REG, OFSY_REG, OFSZ_REG};
+	char *reg_names[6] = {"DATA_FORMAT", "BW_RATE", "POWER_CTL", "OFSX", "OFSY", "OFSZ"};
+	for(uint8_t i = 0; i<REG_READ_NO; i++)
+	{
+		char temp[20] = "";
+		uint8_t temp_val;
+		if( ADXL_ReadReg(regs[i], &temp_val, 1) == ADXL_SUCCESS )
+		{
+			snprintf(temp, 20, "%s %d\n",reg_names[i], temp_val);
+			strcat(readout, temp);
+		}
+		else
+		{
+			ret_val = ADXL_FAILURE;
+			break;
+		}
+	}
+	return ret_val;
 }
 
 ADXL_status_t ADXL_ReadData(int16_t *Xdata, int16_t *Ydata, int16_t *Zdata)

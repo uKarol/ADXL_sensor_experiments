@@ -54,9 +54,19 @@ void MeasurementFSM_run(MeasurementFSM_context_t *context)
 			break;
 
 		 case MEASURE_WAITING:
-			if( UART_Com_CheckStartSignal() == RECPETION_OK )
+			 uint8_t sig;
+			if( UART_Com_CheckStartSignal(&sig) == RECPETION_OK )
 			{
-				context->current_state = MEASURE_GET_SIZE;
+				if(sig == START_SIGNAL)
+				{
+					context->current_state = MEASURE_GET_SIZE;
+				}
+				else if(sig == GET_CFG_SIGNAL)
+				{
+					char readout[150] = "";
+					ADXL_GetConfig(readout);
+					UART_Com_TransmitString(readout);
+				}
 			}
 			break;
 

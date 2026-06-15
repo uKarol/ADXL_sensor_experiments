@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define START_SIGNAL 0x55
+
 #define UART_RX_MAX_SIZE 64
 #define UART_TX_MAX_SIZE 64
 
@@ -61,15 +61,13 @@ ReceptionStatus_t UART_Com_GetSize(uint16_t *size)
 	HAL_StatusTypeDef hal_ret = HAL_UART_Receive(&hlpuart1, uart_data_in, 2, 2000);
 	if( hal_ret == HAL_OK )
 	{
-//	uart_data_in[0] = uart_read_byte(&hlpuart1);
-//	uart_data_in[1] = uart_read_byte(&hlpuart1);
 		*size = ((uint16_t)uart_data_in[0])<<8 | uart_data_in[1];
 		ret_val = RECPETION_OK;
 	}
 	return ret_val;
 }
 
-ReceptionStatus_t UART_Com_CheckStartSignal(void)
+ReceptionStatus_t UART_Com_CheckStartSignal(uint8_t *sig_out)
 {
 	uint8_t uart_data_in;
 	ReceptionStatus_t ret_val = RECEPTION_FAILURE;
@@ -77,7 +75,17 @@ ReceptionStatus_t UART_Com_CheckStartSignal(void)
 	{
 		if(uart_data_in == START_SIGNAL)
 		{
+			*sig_out = START_SIGNAL;
 			ret_val = RECPETION_OK;
+		}
+		else if(uart_data_in == GET_CFG_SIGNAL)
+		{
+			*sig_out = GET_CFG_SIGNAL;
+			ret_val = RECPETION_OK;
+		}
+		else
+		{
+
 		}
 	}
 	return ret_val;
