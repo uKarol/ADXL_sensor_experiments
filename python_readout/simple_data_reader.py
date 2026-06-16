@@ -1,6 +1,9 @@
 import serial
 import statistics
 import time
+import matplotlib.pyplot as plt
+import numpy as np
+import math
 
 with serial.Serial("COM5", 115200, timeout= 2) as ser:
 
@@ -9,7 +12,7 @@ with serial.Serial("COM5", 115200, timeout= 2) as ser:
     ser.flush()
     start_str = ser.read(5)
     print(start_str)
-    number_of_samples = 500
+    number_of_samples = 200
     datasize = number_of_samples.to_bytes(2, byteorder="big")
     num = ser.write(datasize)
     print(num)
@@ -50,3 +53,32 @@ with serial.Serial("COM5", 115200, timeout= 2) as ser:
     print(f"X average: {avg_x}, std dev {std_x}, max {max_x}, min {min_x} ")
     print(f"Y average: {avg_y}, std dev {std_y}, max {max_y}, min {min_y} ")
     print(f"Z average: {avg_z}, std dev {std_z}, max {max_z}, min {min_z} ")
+
+    SCALE = 0.0039
+
+    g_total = [
+        math.sqrt(x*x + y*y + z*z)
+        for x, y, z in samples
+    ]
+
+    print(SCALE * sum(g_total) / len(g_total))
+
+    #xpoints = np.array(1, number_of_samples)
+
+    x = [s[0] * SCALE for s in samples]
+    y = [s[1] * SCALE for s in samples]
+    z = [s[2] * SCALE for s in samples]
+
+    plt.plot(x)
+    plt.plot(y)
+    plt.plot(z)
+    plt.xlabel("Sample")
+    plt.ylabel("ADXL value in g")
+    plt.title("ADXL345 measurements")
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+    plt.hist(z, bins=20)
+    plt.grid()
+    plt.show()
