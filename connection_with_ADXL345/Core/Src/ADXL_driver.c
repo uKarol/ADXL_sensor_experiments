@@ -104,6 +104,21 @@ static ADXL_status_t ADXL_RegSequencer(const RegConfDesc *reg_sequence, uint8_t 
 	return ret_val;
 }
 
+ADXL_status_t ADXL_FlushFifo()
+{
+	ADXL_status_t ret_val = ADXL_SUCCESS;
+	int16_t Xdata;
+	int16_t Ydata;
+	int16_t Zdata;
+	for(uint8_t i = 0; i< 32; i++){
+		if(ADXL_ReadData(&Xdata, &Ydata, &Zdata) != ADXL_SUCCESS)
+		{
+			ret_val = ADXL_FAILURE;
+		}
+	}
+	return ret_val;
+}
+
 ADXL_status_t ADXL_RegInitAlternative()
 {
 	ADXL_status_t ret_val = ADXL_SUCCESS;
@@ -138,15 +153,7 @@ ADXL_status_t ADXL_RegInitAlternative()
 	}
 	// step 3 perform initial readout to reset int flags (without this step fifo will be overrun)
 
-	int16_t Xdata;
-	int16_t Ydata;
-	int16_t Zdata;
-	for(uint8_t i = 0; i< 32; i++){
-		if(ADXL_ReadData(&Xdata, &Ydata, &Zdata) != ADXL_SUCCESS)
-		{
-			ret_val = ADXL_FAILURE;
-		}
-	}
+	ADXL_FlushFifo();
 
 	return ret_val;
 }
