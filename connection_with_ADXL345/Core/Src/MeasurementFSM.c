@@ -15,7 +15,7 @@ void MeasurementFSM_setup(MeasurementFSM_context_t *context)
 {
 	context->measure_ctr = 0;
 
-	if( ADXL_init_default() == ADXL_SUCCESS )
+	if( ADXL_RegInitAlternative() == ADXL_SUCCESS )
 	{
 		context->current_state = MEASURE_WAITING;
 		context->current_error = ADXL_NO_ERROR;
@@ -55,6 +55,7 @@ void MeasurementFSM_run(MeasurementFSM_context_t *context)
 
 		 case MEASURE_WAITING:
 			 uint8_t sig;
+//			 ADXL_FIFO_Check();
 			if( UART_Com_CheckStartSignal(&sig) == RECPETION_OK )
 			{
 				if(sig == START_SIGNAL)

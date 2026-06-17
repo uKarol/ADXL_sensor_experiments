@@ -5,6 +5,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import math
 
+#experimentally determined offsets  
+
+X_OFFSET = 1.94
+Y_OFFSET = -43.01
+Z_OFFSET = -36.79
+
 with serial.Serial("COM5", 115200, timeout= 2) as ser:
 
     num = ser.write(b'U')
@@ -24,9 +30,9 @@ with serial.Serial("COM5", 115200, timeout= 2) as ser:
         try:
             if(segments[0] == 'OK'):
                 print(f'x: {int(segments[1])}, y: {int(segments[2])}, z: {int(segments[3])}' )
-                x = int(segments[1])
-                y = int(segments[2])
-                z = int(segments[3])
+                x = int(segments[1]) + 1.94
+                y = int(segments[2]) - 43.01
+                z = int(segments[3]) - 36.79
                 samples.append((x,y,z))
 
             else:

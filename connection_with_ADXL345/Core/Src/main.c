@@ -47,7 +47,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+volatile uint8_t my_ctr = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -58,7 +58,16 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  if (GPIO_Pin == B1_Pin) {
+	  my_ctr++;
+  }
+  else if(GPIO_Pin == INT0_Pin)
+  {
+	  ADXL_INT1InterruptHandler();
+  }
+}
 /* USER CODE END 0 */
 
 /**
@@ -104,9 +113,10 @@ int main(void)
 
   while (1)
   {
-    /* USER CODE END WHILE */
 	  MeasurementFSM_run(&measure_ctx);
 	  HAL_Delay(10);
+    /* USER CODE END WHILE */
+
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
