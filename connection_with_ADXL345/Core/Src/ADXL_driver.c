@@ -16,6 +16,10 @@
 #define REG_READ_NO 6
 #define TEMP_STR_SIZE 20
 
+#define ONE_SAMPLE_SIZE 6U // sample size in bytes
+#define NUMBER_OF_SAMPLES 16U // number of samples per watermark
+#define READOUT_SIZE (ONE_SAMPLE_SIZE * NUMBER_OF_SAMPLES)
+
 typedef struct
 {
 	uint8_t reg_addr;
@@ -35,18 +39,46 @@ typedef struct
 	RegOperation_t reg_op;
 }RegConfDesc;
 
+typedef enum
+{
+	ADXL_NO_ERROR,
+	ADXL_COMMUNICATION_LOST,
+	ADXL_READOUT_INCOMPLETE,
+	ADXL_UNEXPECTED_BEHAVIOUR
+}ADXL_InterruptErrors_t;
+
+volatile uint8_t ADXL_raw_data[READOUT_SIZE];
+
+
+typedef struct
+{
+	ADXL_StreamStatus CurrentStreamState;
+	uint8_t readout_idx;
+}ADXL_InternalStreamState_t;
+
+static ADXL_InternalStreamState_t CurrentState;
+
+/*
+ * private functions - decsription in code below
+ */
 static ADXL_status_t ADXL_RegSequencer(const RegConfDesc *reg_sequence, uint8_t seq_size, uint8_t *failed_step);
-static ADXL_status_t ADXL_ReadReg(uint8_t reg_id, uint8_t *pValueOut, uint8_t valueSize);
+static ADXL_status_t ADXL_ReadReg(uint8_t reg_id, uint8_t *pValueOut);
 static ADXL_status_t ADXL_WriteReg(uint8_t reg_id, uint8_t DataIn);
+static void ADXL_StreamRead(void);
 
-ADXL_status_t ADXL_SetupFifoAndInt();
-
-ADXL_status_t ADXL_ReadReg(uint8_t reg_id, uint8_t *pValueOut, uint8_t valueSize)
+/**
+ * @brief Read single ADXL register in blockin (polling) mode
+ * @param in uint8_t ADXL register address
+ * @param out uint8_t* pointer to data read from register
+ * @returns ADXL_SUCCESS in case of successful operation
+ * 			ADXL_FAILURE in case of error
+ */
+ADXL_status_t ADXL_ReadReg(uint8_t reg_id, uint8_t *pValueOut)
 {
 	ADXL_status_t ret_val = ADXL_FAILURE;
 	if(HAL_I2C_Master_Transmit(&hi2c1, ADEXL_ID, &reg_id, 1, 100) == HAL_OK)
 	{
-		if(HAL_I2C_Master_Receive(&hi2c1, ADEXL_ID, pValueOut, valueSize, 100) == HAL_OK)
+		if(HAL_I2C_Master_Receive(&hi2c1, ADEXL_ID, pValueOut, 1, 100) == HAL_OK)
 		{
 			ret_val = ADXL_SUCCESS;
 		}
@@ -54,7 +86,13 @@ ADXL_status_t ADXL_ReadReg(uint8_t reg_id, uint8_t *pValueOut, uint8_t valueSize
 	return ret_val;
 }
 
-
+/**
+ * @brief Read single ADXL register in blockin (polling) mode
+ * @param in uint8_t ADXL register address
+ * @param in uint8_t value to be written into register
+ * @returns ADXL_SUCCESS in case of successful operation
+ * 			ADXL_FAILURE in case of error
+ */
 ADXL_status_t ADXL_WriteReg(uint8_t reg_id, uint8_t DataIn)
 {
 	ADXL_status_t ret_val = ADXL_FAILURE;
@@ -84,7 +122,7 @@ static ADXL_status_t ADXL_RegSequencer(const RegConfDesc *reg_sequence, uint8_t 
 		else
 		{
 			uint8_t axdl_out_val;
-			if( ADXL_ReadReg(reg_sequence[i].reg_addr, &axdl_out_val, 1) == ADXL_SUCCESS )
+			if( ADXL_ReadReg(reg_sequence[i].reg_addr, &axdl_out_val) == ADXL_SUCCESS )
 			{
 				if(axdl_out_val != reg_sequence[i].reg_val)
 				{
@@ -104,6 +142,11 @@ static ADXL_status_t ADXL_RegSequencer(const RegConfDesc *reg_sequence, uint8_t 
 	return ret_val;
 }
 
+/**
+ * @brief Read all data from ADXL in order to clear FIFO (in blocking mode), this function should be called after init or overrun
+ * @returns ADXL_SUCCESS in case of successful operation
+ * 			ADXL_FAILURE in case of error
+ */
 ADXL_status_t ADXL_FlushFifo()
 {
 	ADXL_status_t ret_val = ADXL_SUCCESS;
@@ -114,11 +157,17 @@ ADXL_status_t ADXL_FlushFifo()
 		if(ADXL_ReadData(&Xdata, &Ydata, &Zdata) != ADXL_SUCCESS)
 		{
 			ret_val = ADXL_FAILURE;
+			break;
 		}
 	}
 	return ret_val;
 }
 
+/**
+ * @brief default function to perform initialization of ADXL module
+ * @returns ADXL_SUCCESS in case of successful operation
+ * 			ADXL_FAILURE in case of error
+ */
 ADXL_status_t ADXL_RegInitAlternative()
 {
 	ADXL_status_t ret_val = ADXL_SUCCESS;
@@ -153,6 +202,8 @@ ADXL_status_t ADXL_RegInitAlternative()
 	}
 	// step 3 perform initial readout to reset int flags (without this step fifo will be overrun)
 
+	CurrentState.CurrentStreamState = STREAM_IDLE;
+	CurrentState.readout_idx = 0;
 	ADXL_FlushFifo();
 
 	return ret_val;
@@ -176,7 +227,7 @@ ADXL_status_t ADXL_GetConfig(char *readout, uint16_t max_size)
 	for(uint8_t i = 0; i<REG_READ_NO; i++)
 	{
 		uint8_t temp_val;
-		if( ADXL_ReadReg(ReadoutRegs[i].reg_addr, &temp_val, 1) == ADXL_SUCCESS )
+		if( ADXL_ReadReg(ReadoutRegs[i].reg_addr, &temp_val) == ADXL_SUCCESS )
 		{
 			offset += snprintf(&(readout[offset]), max_size-offset, "%s %d\n", ReadoutRegs[i].reg_name, temp_val);
 		}
@@ -189,6 +240,9 @@ ADXL_status_t ADXL_GetConfig(char *readout, uint16_t max_size)
 	return ret_val;
 }
 
+/**
+ * breif Read data from ADXL in blocking mode
+ */
 ADXL_status_t ADXL_ReadData(int16_t *Xdata, int16_t *Ydata, int16_t *Zdata)
 {
 	ADXL_status_t ret_val = ADXL_FAILURE;
@@ -207,20 +261,16 @@ ADXL_status_t ADXL_ReadData(int16_t *Xdata, int16_t *Ydata, int16_t *Zdata)
  	return ret_val;
 }
 
-
-uint8_t success_rate;
-
-
 uint8_t dbg_ctr;
 // for debug purposes
 void ADXL_FIFO_Check(void)
 {
 	uint8_t data_out;
-	if(ADXL_ReadReg(FIFO_STATUS, &data_out, 1) == ADXL_SUCCESS)
+	if(ADXL_ReadReg(FIFO_STATUS, &data_out) == ADXL_SUCCESS)
 	{
 		dbg_ctr++;
 	}
-	if(ADXL_ReadReg(INT_SOURCE, &data_out, 1) == ADXL_SUCCESS)
+	if(ADXL_ReadReg(INT_SOURCE, &data_out) == ADXL_SUCCESS)
 	{
 		if(data_out != 0)
 		{
@@ -234,31 +284,115 @@ void ADXL_FIFO_Check(void)
 		}
 
 	}
-	if(ADXL_ReadReg(INT_SOURCE, &data_out, 1) == ADXL_SUCCESS)
+	if(ADXL_ReadReg(INT_SOURCE, &data_out) == ADXL_SUCCESS)
 	{
-		ADXL_ReadReg(FIFO_STATUS, &data_out, 1);
+		ADXL_ReadReg(FIFO_STATUS, &data_out);
 		dbg_ctr++;
 	}
+}
+
+
+void ADXL_ErrorHandler(ADXL_InterruptErrors_t current_err)
+{
+	// to be implemented in future
 }
 
 void ADXL_INT1InterruptHandler(void)
 {
 	uint8_t out_val;
-	ADXL_ReadReg(INT_SOURCE, &out_val, 1);
+	ADXL_ReadReg(INT_SOURCE, &out_val);
 	if(out_val & ADXL_INT_ENABLE_WATERMARK)
 	{
-//		for(int i = 0; i< 32; i++){
-//			int16_t Xdata;
-//			int16_t Ydata;
-//			int16_t Zdata;
-//			ADXL_ReadData(&Xdata, &Ydata, &Zdata);
-//		}
-		success_rate++;
+		if(ADXL_ReadReg(FIFO_STATUS, &out_val) == ADXL_SUCCESS)
+		{
+			if((out_val & FIFO_ENTRIES_BIT_MSK) >= NUMBER_OF_SAMPLES )
+			{
+				ADXL_StreamRead();
+			}
+			else
+			{
+				ADXL_ErrorHandler(ADXL_READOUT_INCOMPLETE);
+			}
+		}
+		else
+		{
+			ADXL_ErrorHandler(ADXL_COMMUNICATION_LOST);
+		}
 	}
-	ADXL_ReadReg(FIFO_STATUS, &out_val, 1);
-	if(out_val==16)
+	else
 	{
-		success_rate++;
+		ADXL_ErrorHandler(ADXL_UNEXPECTED_BEHAVIOUR);
 	}
+}
 
+/**
+ * @brief Start reading data from ADXL in non-blocking mode by means of DMA
+ */
+void ADXL_StreamRead(void)
+{
+	// read 96 bytes (DMA) and put them to array
+	if(STREAM_IDLE == CurrentState.CurrentStreamState)
+	{
+		if( HAL_I2C_Mem_Read_DMA(&hi2c1, ADEXL_ID, DATAX0_REG, 1, ADXL_raw_data, ONE_SAMPLE_SIZE) == HAL_OK)
+		{
+			CurrentState.CurrentStreamState = STREAM_IN_PROGRESS;
+		}
+		else
+		{
+			CurrentState.CurrentStreamState = STREAM_ERROR;
+		}
+	}
+	else
+	{
+		CurrentState.CurrentStreamState = STREAM_ERROR;
+	}
+}
+
+
+
+void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+	if(hi2c == &hi2c1)
+	{
+		if(STREAM_IN_PROGRESS == CurrentState.CurrentStreamState)
+		{
+			if(CurrentState.readout_idx == (NUMBER_OF_SAMPLES-1))
+			{
+				CurrentState.CurrentStreamState = STREAM_COMPLETED;
+				CurrentState.readout_idx = 0;
+			}
+			else
+			{
+				CurrentState.readout_idx++;
+				if( HAL_I2C_Mem_Read_DMA(&hi2c1, ADEXL_ID, DATAX0_REG, 1, &(ADXL_raw_data[CurrentState.readout_idx * ONE_SAMPLE_SIZE]), ONE_SAMPLE_SIZE) == HAL_OK)
+				{
+					CurrentState.CurrentStreamState = STREAM_IN_PROGRESS;
+				}
+				else
+				{
+					CurrentState.CurrentStreamState = STREAM_ERROR;
+				}
+			}
+		}
+	}
+}
+
+ADXL_StreamStatus ADXL_GetStreamStatus(void)
+{
+	return CurrentState.CurrentStreamState;
+}
+
+void ADXL_ReleaseDataBuffer(void)
+{
+	CurrentState.CurrentStreamState = STREAM_IDLE;
+}
+
+volatile uint8_t* ADXL_GetStreamedData(void)
+{
+	volatile uint8_t *ret_val = NULL;
+	if(STREAM_COMPLETED == CurrentState.CurrentStreamState)
+	{
+		ret_val = ADXL_raw_data;
+	}
+	return ret_val;
 }

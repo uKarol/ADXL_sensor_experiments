@@ -55,6 +55,7 @@
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
+extern DMA_HandleTypeDef hdma_i2c1_rx;
 extern I2C_HandleTypeDef hi2c1;
 /* USER CODE BEGIN EV */
 
@@ -213,6 +214,20 @@ void EXTI4_IRQHandler(void)
 }
 
 /**
+  * @brief This function handles DMA1 channel1 global interrupt.
+  */
+void DMA1_Channel1_IRQHandler(void)
+{
+  /* USER CODE BEGIN DMA1_Channel1_IRQn 0 */
+
+  /* USER CODE END DMA1_Channel1_IRQn 0 */
+  HAL_DMA_IRQHandler(&hdma_i2c1_rx);
+  /* USER CODE BEGIN DMA1_Channel1_IRQn 1 */
+
+  /* USER CODE END DMA1_Channel1_IRQn 1 */
+}
+
+/**
   * @brief This function handles I2C1 event interrupt / I2C1 wake-up interrupt through EXTI line 23.
   */
 void I2C1_EV_IRQHandler(void)
@@ -252,6 +267,20 @@ void EXTI15_10_IRQHandler(void)
   /* USER CODE BEGIN EXTI15_10_IRQn 1 */
 
   /* USER CODE END EXTI15_10_IRQn 1 */
+}
+
+/**
+  * @brief This function handles DMAMUX overrun interrupt.
+  */
+void DMAMUX_OVR_IRQHandler(void)
+{
+  /* USER CODE BEGIN DMAMUX_OVR_IRQn 0 */
+
+  /* USER CODE END DMAMUX_OVR_IRQn 0 */
+
+  /* USER CODE BEGIN DMAMUX_OVR_IRQn 1 */
+
+  /* USER CODE END DMAMUX_OVR_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */

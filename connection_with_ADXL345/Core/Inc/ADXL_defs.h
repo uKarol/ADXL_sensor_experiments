@@ -32,7 +32,7 @@
 // adxl registers
 
 #define POWER_CTL 0x2DU
-
+#define FIFO_ENTRIES_BIT_MSK 0x3FU
 // adxl bits
 #define POWER_CTL_MEASURE (1U<<3U)
 

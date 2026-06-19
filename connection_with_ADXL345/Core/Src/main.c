@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "dma.h"
 #include "i2c.h"
 #include "usart.h"
 #include "gpio.h"
@@ -99,6 +100,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_LPUART1_UART_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
@@ -110,11 +112,17 @@ int main(void)
 
 
   MeasurementFSM_setup(&measure_ctx);
-
+  uint8_t *captured_data;
   while (1)
   {
-	  MeasurementFSM_run(&measure_ctx);
-	  HAL_Delay(10);
+	  //MeasurementFSM_run(&measure_ctx);
+
+	  if(ADXL_GetStreamStatus() == STREAM_COMPLETED)
+	  {
+		  captured_data = ADXL_GetStreamedData();
+		  HAL_UART_Transmit(&hlpuart1, captured_data, 96, 1000);
+		  ADXL_ReleaseDataBuffer();
+	  }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
