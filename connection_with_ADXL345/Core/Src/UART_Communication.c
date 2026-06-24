@@ -13,6 +13,16 @@
 #define UART_RX_MAX_SIZE 64
 #define UART_TX_MAX_SIZE 64
 
+TransmissionStatus_t UART_Com_TransmitRawData(uint8_t *data, uint32_t size)
+{
+	TransmissionStatus_t ret_val = TRANSMIT_FAILURE;
+	if(HAL_UART_Transmit(&hlpuart1, data, size, 100) == HAL_OK)
+	{
+		ret_val = TRANSMIT_OK;
+	}
+	return ret_val;
+}
+
 TransmissionStatus_t UART_Com_TransmitData(int16_t Xdata, int16_t Ydata, int16_t Zdata)
 {
 	TransmissionStatus_t ret_val = TRANSMIT_FAILURE;

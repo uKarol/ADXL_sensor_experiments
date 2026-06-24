@@ -69,6 +69,14 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	  ADXL_INT1InterruptHandler();
   }
 }
+
+void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+	if(hi2c == &hi2c1)
+	{
+		ADXL_DMAStreamComplete();
+	}
+}
 /* USER CODE END 0 */
 
 /**
@@ -109,20 +117,20 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  MeasurementInitStruct initdata = {16};
 
+  MeasurementFSM_setup(&measure_ctx, &initdata);
 
-  MeasurementFSM_setup(&measure_ctx);
-  uint8_t *captured_data;
   while (1)
   {
-	  //MeasurementFSM_run(&measure_ctx);
+	  MeasurementFSM_run(&measure_ctx);
 
-	  if(ADXL_GetStreamStatus() == STREAM_COMPLETED)
-	  {
-		  captured_data = ADXL_GetStreamedData();
-		  HAL_UART_Transmit(&hlpuart1, captured_data, 96, 1000);
-		  ADXL_ReleaseDataBuffer();
-	  }
+//	  if(ADXL_GetStreamStatus() == STREAM_COMPLETED)
+//	  {
+//		  captured_data = ADXL_GetStreamedData();
+//		  HAL_UART_Transmit(&hlpuart1, captured_data, 96, 1000);
+//		  ADXL_ReleaseDataBuffer();
+//	  }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

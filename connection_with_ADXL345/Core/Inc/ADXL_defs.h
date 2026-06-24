@@ -29,6 +29,7 @@
 #define FIFO_CTL 0x38
 #define FIFO_STATUS 0x39
 
+#define FIFO_CTL_SAMPLES_MASK 0x1F
 // adxl registers
 
 #define POWER_CTL 0x2DU
@@ -41,6 +42,6 @@
 
 #define ADXL_FIFO_CTL_STREAM (1U<<7)
 #define ADFL_FIFO_16_SAMPLES (1U<<4)
-
+#define ADFL_FIFO_8_SAMPLES (1U<<3)
 
 #endif /* INC_ADXL_DEFS_H_ */

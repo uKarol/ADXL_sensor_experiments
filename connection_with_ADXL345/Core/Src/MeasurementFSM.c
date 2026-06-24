@@ -11,11 +11,14 @@
 
 #define READOUT_NUM 100
 
-void MeasurementFSM_setup(MeasurementFSM_context_t *context)
+void MeasurementFSM_setup(MeasurementFSM_context_t *context, MeasurementInitStruct *init_data)
 {
 	context->measure_ctr = 0;
+	context->number_of_fifo_samples = init_data->number_of_fifo_samples;
 
-	if( ADXL_RegInitAlternative() == ADXL_SUCCESS )
+	ADXL_Init_t init_struct = {init_data->number_of_fifo_samples};
+
+	if( ADXL_RegInitAlternative(&init_struct) == ADXL_SUCCESS )
 	{
 		context->current_state = MEASURE_WAITING;
 		context->current_error = ADXL_NO_ERROR;
@@ -29,24 +32,27 @@ void MeasurementFSM_setup(MeasurementFSM_context_t *context)
 
 void MeasurementFSM_run(MeasurementFSM_context_t *context)
 {
-	int16_t Xdata;
-	int16_t Ydata;
-	int16_t Zdata;
+	uint8_t *captured_data;
 
 	switch(context->current_state)
 	{
 		case MEASURE_PROCESSING:
-			if( ADXL_ReadData(&Xdata, &Ydata, &Zdata) == ADXL_SUCCESS)
+			ADXL_StreamStatus stream_status= ADXL_GetStreamStatus();
+			if(stream_status == STREAM_COMPLETED)
 			{
+				captured_data = ADXL_GetStreamedData();
+				UART_Com_TransmitString("OK\n");
+				UART_Com_TransmitRawData(captured_data, (context->number_of_fifo_samples*ONE_SAMPLE_SIZE));
+				ADXL_ReleaseDataBuffer();
 				context->measure_ctr++;
-				UART_Com_TransmitData(Xdata, Ydata, Zdata);
 				if(context->measure_ctr >= context->expected_size)
 				{
 					context->measure_ctr = 0;
 					context->current_state = MEASURE_WAITING;
+					ADXL_StopStreamMeasurements();
 				}
 			}
-			else
+			else if(stream_status == STREAM_ERROR)
 			{
 				context->current_state = MEASURE_ERROR;
 				context->current_error = ADXL_READ_FAILURE;
@@ -80,8 +86,9 @@ void MeasurementFSM_run(MeasurementFSM_context_t *context)
 			 }
 			 else
 			 {
-				 context->expected_size = 100;
+				 context->expected_size = 5;
 			 }
+			  ADXL_StartStreamMeasurements();
 			 context->current_state = MEASURE_PROCESSING;
 		break;
 
