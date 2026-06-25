@@ -11,6 +11,9 @@ X_OFFSET = 1.94
 Y_OFFSET = -43.01
 Z_OFFSET = -36.79
 
+WATERMARK_SIZE = 16
+ONE_SAMPLE_SIZE = 6
+
 with serial.Serial("COM5", 115200, timeout= 2) as ser:
 
     num = ser.write(b'U')
@@ -18,25 +21,29 @@ with serial.Serial("COM5", 115200, timeout= 2) as ser:
     ser.flush()
     start_str = ser.read(5)
     print(start_str)
-    number_of_samples = 10
+    number_of_samples = 20
     datasize = number_of_samples.to_bytes(2, byteorder="big")
     num = ser.write(datasize)
-    print(num)
-
+    containers = [[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
     samples = []
-    for i in range (0, number_of_samples):
+    for j in range (0, number_of_samples):
         line = ser.readline().decode()
         if(line == "OK\n"):
-            data = ser.read(96)
-            for i in range(0, len(data), 6):
+            data = ser.read(WATERMARK_SIZE * ONE_SAMPLE_SIZE)
+            sample_ctr = 0
+            for i in range(0, len(data), ONE_SAMPLE_SIZE):
                 x = int.from_bytes(data[i:i+2], "little", signed=True)
                 y = int.from_bytes(data[i+2:i+4], "little", signed=True)
                 z = int.from_bytes(data[i+4:i+6], "little", signed=True)
-                print(f"{x}, {y}, {z}")
+                print(f"sample {sample_ctr}:  {x}, {y}, {z}")
+                containers[sample_ctr].append((x,y,z))
                 samples.append((x,y,z))
+                sample_ctr = sample_ctr + 1
 
         else:
             print(f"ERROR OCCURED: {line}")
+
+    #samples = samples[2:]
 
 
     avg_x = sum(s[0] for s in samples) / len(samples)
@@ -73,6 +80,14 @@ with serial.Serial("COM5", 115200, timeout= 2) as ser:
     x = [s[0] * SCALE for s in samples]
     y = [s[1] * SCALE for s in samples]
     z = [s[2] * SCALE for s in samples]
+
+    sample_ctr = 0
+    for x in containers:
+        avg_x = sum(s[0] for s in x) / len(x)
+        avg_y = sum(s[1] for s in x) / len(x)
+        avg_z = sum(s[2] for s in x) / len(x)
+        print(f"{sample_ctr} avg x {avg_x} avg y {avg_y} avg z {avg_z}")
+        sample_ctr = sample_ctr+1
 
     plt.plot(x)
     plt.plot(y)

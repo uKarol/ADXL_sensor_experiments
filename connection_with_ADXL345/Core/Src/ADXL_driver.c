@@ -240,6 +240,7 @@ ADXL_status_t ADXL_StartStreamMeasurements(void)
 	if(CurrentState.DriverState == DRIVER_HALTED)
 	{
 		ADXL_Errors_t reg_status = ADXL_WriteReg(POWER_CTL, POWER_CTL_MEASURE);
+		HAL_Delay(100);
 		if(reg_status == ADXL_NO_ERROR)
 		{
 			ADXL_Errors_t FifoState = ADXL_FlushFifoInternal();
@@ -297,6 +298,7 @@ ADXL_status_t ADXL_RegInitAlternative(ADXL_Init_t *init_data)
 			{INT_ENABLE_REG, ADXL_INT_ENABLE_WATERMARK | ADXL_INT_ENABLE_OVERRUN , WRITE_REG},				// enable interrupt watermark
 			{INT_ENABLE_REG, ADXL_INT_ENABLE_WATERMARK | ADXL_INT_ENABLE_OVERRUN, VERIFY_REG},				// check if config was applied properly
 			{INT_MAP_REG, 0, WRITE_REG},										// set int mapping to 0 - interrupts mapet to INT 1 output
+			{BW_RATE_REG, 0x8, WRITE_REG}
 //			{POWER_CTL, POWER_CTL_MEASURE, WRITE_REG},							// set POWER_CTL_MEASURE - enable measurements
 //			{POWER_CTL, POWER_CTL_MEASURE, VERIFY_REG},							// check if proper bits are set
 	};
@@ -504,11 +506,6 @@ void ADXL_StreamRead(void)
 
 void ADXL_DMAStreamComplete(void)
 {
-	uint8_t fifo_status;
-	ADXL_ReadReg(FIFO_STATUS, &fifo_status);
-	char data[8];
-	snprintf(data, 8, "FIFO %x\n", fifo_status);
-	UART_Com_TransmitString(data);
 
 	if(CurrentState.DriverState == DRIVER_READY)
 	{

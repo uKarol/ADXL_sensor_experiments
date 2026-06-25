@@ -86,7 +86,7 @@ void MeasurementFSM_run(MeasurementFSM_context_t *context)
 			 }
 			 else
 			 {
-				 context->expected_size = 5;
+				 context->expected_size = 1;
 			 }
 			  ADXL_StartStreamMeasurements();
 			 context->current_state = MEASURE_PROCESSING;
