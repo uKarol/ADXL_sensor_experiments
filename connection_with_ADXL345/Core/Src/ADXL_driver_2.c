@@ -1,17 +1,17 @@
 /*
- * ADXL_driver.c
+ * ADXL_driver_2.c
  *
- *  Created on: Jun 9, 2026
+ *  Created on: Jun 25, 2026
  *      Author: Karol
  */
-#if 0
 
-#include "ADXL_defs.h"
-#include "ADXL_driver.h"
-#include "string.h"
+#include "fsm.h"
 #include "i2c.h"
-#include <stdio.h>
-#include <stdbool.h>
+#include "ADXL_driver.h"
+#include "ADXL_defs.h"
+#include "simple_queue.h"
+#include "stdio.h"
+#include "stdbool.h"
 
 #define DEV_ID_REG 0U
 #define DEV_ID 0xE5
@@ -22,6 +22,27 @@
 
 #define MAX_NUMBER_OF_SAMPLES 32U // number of samples per watermark
 #define MAX_READOUT_SIZE (ONE_SAMPLE_SIZE * MAX_NUMBER_OF_SAMPLES)
+
+typedef enum
+{
+	ADXL_EXTI_IRQ,
+	DMA_COMPLETED,
+	ADXL_FIFO_OVERRUN,
+	ADXL_FIFO_READY,
+	BUFFER_RELEASE_REQUEST,
+	FSM_RESET,
+	ERROR_OCCURED,
+	STREAM_FINISHED,
+	RESET_ERROR_REQUEST,
+}ADXL_FSM_Events;
+
+typedef struct
+{
+	uint8_t readout_num;
+	uint8_t fifo_samples_num;
+	ADXL_Errors_t stream_errors;
+	ADXL_StreamStatus current_state;
+}fsm_ctx_data;
 
 typedef struct
 {
@@ -47,24 +68,33 @@ typedef struct
 {
 	ADXL_DriverState_t DriverState;
 	ADXL_Errors_t LastError;
-	ADXL_StreamStatus CurrentStreamState;
-	uint8_t FifoSamplesNum;
-	uint8_t readout_idx;
-    uint32_t fifo_overrun_cnt;
-    uint32_t readout_problem_cnt;
 }ADXL_InternalState_t;
 
-volatile static ADXL_InternalState_t CurrentState = {DRIVER_NOT_INITIALIZED, ADXL_NO_ERROR, STREAM_IDLE, 0, 0};
+volatile static ADXL_InternalState_t CurrentState = {DRIVER_NOT_INITIALIZED, ADXL_NO_ERROR};
+
+static void ADXL_SetEvent(ADXL_FSM_Events evt);
+
+FSM_ret StreamCompleted_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
+FSM_ret StreamInProgress_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
+FSM_ret StreamError_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
+FSM_ret StreamWaiting_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
+
 uint8_t ADXL_raw_data[MAX_READOUT_SIZE];
 
-/*
- * private functions - decsription in code below
- */
-static ADXL_Errors_t ADXL_RegSequencer(const RegConfDesc *reg_sequence, uint8_t seq_size, uint8_t *failed_step);
-static ADXL_Errors_t ADXL_ReadReg(uint8_t reg_id, uint8_t *pValueOut);
-static ADXL_Errors_t ADXL_WriteReg(uint8_t reg_id, uint8_t DataIn);
-static void ADXL_StreamRead(void);
+#define EVT_BUFFER_CAPACITY (10U * sizeof(FsmEvent_t))
+SimpleQueue_t ADXL_queue;
+uint8_t adxl_queue_buffer[EVT_BUFFER_CAPACITY];
 
+fsm_context StreamFsmContext;
+fsm_ctx_data StreamFsmData;
+
+/**
+ * @brief Read single ADXL register in blockin (polling) mode
+ * @param in uint8_t ADXL register address
+ * @param out uint8_t* pointer to data read from register
+ * @returns ADXL_SUCCESS in case of successful operation
+ * 			ADXL_FAILURE in case of error
+ */
 
 static bool ADXL_IsErrRecoveravle(ADXL_Errors_t curr_err)
 {
@@ -89,18 +119,6 @@ static inline void ADXL_SetError(ADXL_Errors_t CurrentError)
 	}
 }
 
-ADXL_Errors_t ADXL_GetLastError(void)
-{
-	return CurrentState.LastError;
-}
-
-/**
- * @brief Read single ADXL register in blockin (polling) mode
- * @param in uint8_t ADXL register address
- * @param out uint8_t* pointer to data read from register
- * @returns ADXL_SUCCESS in case of successful operation
- * 			ADXL_FAILURE in case of error
- */
 static ADXL_Errors_t ADXL_ReadReg(uint8_t reg_id, uint8_t *pValueOut)
 {
 	ADXL_Errors_t ret_val = ADXL_NO_ERROR;
@@ -129,6 +147,7 @@ static ADXL_Errors_t ADXL_WriteReg(uint8_t reg_id, uint8_t DataIn)
 	}
 	return ret_val;
 }
+
 
 /*
  * @brief write or check sequence of registers in blocking mode
@@ -191,12 +210,258 @@ static ADXL_Errors_t ADXL_FlushFifoInternal()
 		}
 		if(ret_val == ADXL_NO_ERROR)
 		{
-			CurrentState.CurrentStreamState = STREAM_IDLE;
+			//ADXL_SetEvent(RESET_ERROR_REQUEST);
 		}
 	}
 	else
 	{
 		ret_val = reg_status;
+	}
+	return ret_val;
+}
+
+
+void ADXL_Init()
+{
+	SimpleQueueInit(&ADXL_queue, adxl_queue_buffer, EVT_BUFFER_CAPACITY);
+	Fsm_Init(&StreamFsmContext, StreamWaiting_StateHandler , &StreamFsmData);
+}
+
+void ADXL_SetEvent(ADXL_FSM_Events evt)
+{
+	FsmEvent_t user_event = {evt, NULL};
+	SimpleQueuePut(&ADXL_queue, (void*)(&user_event), sizeof(user_event));
+}
+
+void ADXL_task()
+{
+	FsmEvent_t current_event;
+	if( SimpleQueueGet(&ADXL_queue, (void*)(&current_event), sizeof(current_event)) == QUEUE_OK)
+	{
+		Fsm_ProcessEvent(&StreamFsmContext, &current_event);
+	}
+	else
+	{
+		// no event in queue
+	}
+}
+
+
+
+FSM_ret StreamWaiting_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
+{
+	FSM_ret ret_val = FSM_ERROR;
+	uint8_t out_val;
+	ADXL_ReadReg(INT_SOURCE, &out_val);
+
+	ADXL_FSM_Events current_event = (ADXL_FSM_Events)user_event->user_event;
+	fsm_ctx_data *context_data = (fsm_ctx_data*)ctx->user_data;
+
+	switch(current_event)
+	{
+		case ADXL_EXTI_IRQ:
+			if(out_val & ADXL_INT_ENABLE_OVERRUN)
+			{
+				ctx->current_state = StreamError_StateHandler;
+				context_data->stream_errors = ADXL_OVERRUN;
+				ADXL_SetEvent(ERROR_OCCURED);
+			}
+			else if(out_val & ADXL_INT_ENABLE_WATERMARK)
+			{
+				if(ADXL_ReadReg(FIFO_STATUS, &out_val) == ADXL_NO_ERROR)
+				{
+					if((out_val & FIFO_ENTRIES_BIT_MSK) >= context_data->fifo_samples_num )
+					{
+						if( HAL_I2C_Mem_Read_DMA(&hi2c1, ADEXL_ID, DATAX0_REG, 1, ADXL_raw_data, ONE_SAMPLE_SIZE) == HAL_OK)
+						{
+							ctx->current_state = StreamInProgress_StateHandler;
+							context_data->current_state = STREAM_IN_PROGRESS;
+						}
+					}
+					else
+					{
+						ctx->current_state = StreamError_StateHandler;
+						context_data->stream_errors = ADXL_READOUT_INCOMPLETE;
+						context_data->current_state = STREAM_ERROR;
+						ADXL_SetEvent(ERROR_OCCURED);
+					}
+				}
+				else
+				{
+					ctx->current_state = StreamError_StateHandler;
+					context_data->stream_errors = ADXL_COMMUNICATION_LOST;
+					context_data->current_state = STREAM_ERROR;
+					ADXL_SetEvent(ERROR_OCCURED);
+				}
+			}
+			else
+			{
+				ctx->current_state = StreamError_StateHandler;
+				context_data->stream_errors = ADXL_UNEXPECTED_BEHAVIOUR;
+				context_data->current_state = STREAM_ERROR;
+				ADXL_SetEvent(ERROR_OCCURED);
+			}
+		default:
+			break;
+
+	}
+	return ret_val;
+}
+
+
+FSM_ret StreamInProgress_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
+{
+	FSM_ret ret_val = FSM_OK;
+	ADXL_FSM_Events current_event = (ADXL_FSM_Events)user_event->user_event;
+	fsm_ctx_data *context_data = (fsm_ctx_data*)ctx->user_data;
+	switch(current_event)
+	{
+		case DMA_COMPLETED:
+
+			if(context_data->readout_num == (context_data->fifo_samples_num-1))
+			{
+				context_data->readout_num = 0;
+				context_data->current_state = STREAM_COMPLETED;
+				ctx->current_state = StreamCompleted_StateHandler;
+
+			}
+			else
+			{
+				context_data->readout_num++;
+				if( HAL_I2C_Mem_Read_DMA(&hi2c1, ADEXL_ID, DATAX0_REG, 1, &(ADXL_raw_data[context_data->readout_num * ONE_SAMPLE_SIZE]), ONE_SAMPLE_SIZE) != HAL_OK)
+				{
+					ret_val = FSM_ERROR;
+					context_data->current_state = STREAM_ERROR;
+					ctx->current_state = StreamError_StateHandler;
+					context_data->stream_errors = ADXL_DMA_PROBLEM;
+					ADXL_SetEvent(ERROR_OCCURED);
+				}
+			}
+			break;
+
+		default:
+			ret_val = FSM_ERROR;
+			context_data->current_state = STREAM_ERROR;
+			ctx->current_state = StreamError_StateHandler;
+			context_data->stream_errors = ADXL_UNEXPECTED_BEHAVIOUR;
+			ADXL_SetEvent(ERROR_OCCURED);
+			break;
+
+	}
+	return ret_val;
+}
+
+FSM_ret StreamCompleted_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
+{
+	FSM_ret ret_val = FSM_OK;
+	ADXL_FSM_Events current_event = (ADXL_FSM_Events)user_event->user_event;
+	fsm_ctx_data *context_data = (fsm_ctx_data*)ctx->user_data;
+	switch(current_event)
+	{
+		case STREAM_FINISHED:
+			break;
+		case BUFFER_RELEASE_REQUEST:
+			ctx->current_state = StreamWaiting_StateHandler;
+			context_data->current_state = STREAM_IDLE;
+			break;
+
+		default:
+			ret_val = FSM_ERROR;
+			ctx->current_state = StreamError_StateHandler;
+			context_data->current_state = STREAM_ERROR;
+			context_data->stream_errors = ADXL_UNEXPECTED_BEHAVIOUR;
+			ADXL_SetEvent(ERROR_OCCURED);
+			break;
+
+	}
+	return ret_val;
+}
+
+FSM_ret StreamError_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
+{
+	FSM_ret ret_val = FSM_OK;
+	ADXL_FSM_Events current_event = (ADXL_FSM_Events)user_event->user_event;
+	fsm_ctx_data *context_data = (fsm_ctx_data*)ctx->user_data;
+	switch(current_event)
+	{
+		case ERROR_OCCURED:
+			ret_val = FSM_ERROR;
+			ADXL_SetError(context_data->stream_errors);
+			break;
+		case RESET_ERROR_REQUEST:
+			ret_val = FSM_OK;
+			context_data->current_state = STREAM_IDLE;
+			context_data->readout_num = 0;
+			context_data->stream_errors = ADXL_NO_ERROR;
+			ctx->current_state = StreamWaiting_StateHandler;
+			break;
+
+		default:
+			ret_val = FSM_ERROR;
+			break;
+
+	}
+	return ret_val;
+}
+
+
+void ADXL_INT1InterruptHandler(void)
+{
+	if(CurrentState.DriverState == DRIVER_READY)
+	{
+		ADXL_SetEvent(ADXL_EXTI_IRQ);
+	}
+}
+
+void ADXL_DMAStreamComplete(void)
+{
+
+	if(CurrentState.DriverState == DRIVER_READY)
+	{
+		ADXL_SetEvent(DMA_COMPLETED);
+	}
+}
+
+/**
+ * @brief Get Status of readout stream
+ */
+ADXL_StreamStatus ADXL_GetStreamStatus(void)
+{
+	if(CurrentState.DriverState == DRIVER_READY)
+	{
+		return StreamFsmData.current_state;
+	}
+	else
+	{
+		return STREAM_NOT_INITIALIZED;
+	}
+}
+
+/**
+ * @brief Release buffer with samples
+ */
+void ADXL_ReleaseDataBuffer(void)
+{
+	if(CurrentState.DriverState == DRIVER_READY)
+	{
+		ADXL_SetEvent(BUFFER_RELEASE_REQUEST);
+	}
+}
+
+/**
+ * @brief Release buffer with samples
+ * @returns NULL - in case of error
+ * 			uint8_t* - address of buffer with samples - fixed size of 16
+ */
+uint8_t* ADXL_GetStreamedData(void)
+{
+	uint8_t *ret_val = NULL;
+	if(CurrentState.DriverState == DRIVER_READY)
+	{
+		if(STREAM_COMPLETED == StreamFsmData.current_state)
+		{
+			ret_val = ADXL_raw_data;
+		}
 	}
 	return ret_val;
 }
@@ -249,8 +514,6 @@ ADXL_status_t ADXL_StartStreamMeasurements(void)
 			if(FifoState == ADXL_NO_ERROR)
 			{
 				CurrentState.DriverState = DRIVER_READY;
-				CurrentState.CurrentStreamState = STREAM_IDLE;
-				CurrentState.readout_idx = 0;
 				ret_val = ADXL_SUCCESS;
 			}
 			else
@@ -316,8 +579,9 @@ ADXL_status_t ADXL_RegInitAlternative(ADXL_Init_t *init_data)
 		if( SeqState == ADXL_NO_ERROR )
 		{
 			CurrentState.DriverState = DRIVER_HALTED;
-			CurrentState.FifoSamplesNum = init_data->FifoSamples;
+			StreamFsmData.fifo_samples_num = init_data->FifoSamples;
 			ret_val = ADXL_SUCCESS;
+			ADXL_Init();
 		}
 		else
 		{
@@ -407,176 +671,3 @@ ADXL_status_t ADXL_ReadData(int16_t *Xdata, int16_t *Ydata, int16_t *Zdata)
  	return ret_val;
 }
 
-uint8_t dbg_ctr;
-// for debug purposes
-void ADXL_FIFO_Check(void)
-{
-	if(CurrentState.DriverState == DRIVER_READY)
-	{
-		uint8_t data_out;
-		if(ADXL_ReadReg(FIFO_STATUS, &data_out) == ADXL_NO_ERROR)
-		{
-			dbg_ctr++;
-		}
-		if(ADXL_ReadReg(INT_SOURCE, &data_out) == ADXL_NO_ERROR)
-		{
-			if(data_out != 0)
-			{
-				dbg_ctr++;
-				int16_t Xdata;
-				int16_t Ydata;
-				int16_t Zdata;
-				for(int i = 0; i< 32; i++){
-					ADXL_ReadData(&Xdata, &Ydata, &Zdata);
-				}
-			}
-
-		}
-		if(ADXL_ReadReg(INT_SOURCE, &data_out) == ADXL_NO_ERROR)
-		{
-			ADXL_ReadReg(FIFO_STATUS, &data_out);
-			dbg_ctr++;
-		}
-	}
-}
-
-void ADXL_INT1InterruptHandler(void)
-{
-	if(CurrentState.DriverState == DRIVER_READY)
-	{
-		uint8_t out_val;
-		ADXL_ReadReg(INT_SOURCE, &out_val);
-		if(out_val & ADXL_INT_ENABLE_OVERRUN)
-		{
-			// overrun occured
-			CurrentState.fifo_overrun_cnt++;
-			ADXL_SetError(ADXL_OVERRUN);
-			CurrentState.CurrentStreamState = STREAM_ERROR;
-		}
-		else if(out_val & ADXL_INT_ENABLE_WATERMARK)
-		{
-			if(ADXL_ReadReg(FIFO_STATUS, &out_val) == ADXL_NO_ERROR)
-			{
-				if((out_val & FIFO_ENTRIES_BIT_MSK) >= CurrentState.FifoSamplesNum )
-				{
-					ADXL_StreamRead();
-				}
-				else
-				{
-					CurrentState.CurrentStreamState = STREAM_ERROR;
-					ADXL_SetError(ADXL_READOUT_INCOMPLETE);
-					CurrentState.readout_problem_cnt++;
-				}
-			}
-			else
-			{
-				ADXL_SetError(ADXL_COMMUNICATION_LOST);
-			}
-		}
-		else
-		{
-			ADXL_SetError(ADXL_UNEXPECTED_BEHAVIOUR);
-		}
-	}
-}
-
-/**
- * @brief Start reading data from ADXL in non-blocking mode by means of DMA
- */
-void ADXL_StreamRead(void)
-{
-	// read 96 bytes (DMA) and put them to array
-	if(STREAM_IDLE == CurrentState.CurrentStreamState)
-	{
-		if( HAL_I2C_Mem_Read_DMA(&hi2c1, ADEXL_ID, DATAX0_REG, 1, ADXL_raw_data, ONE_SAMPLE_SIZE) == HAL_OK)
-		{
-			CurrentState.CurrentStreamState = STREAM_IN_PROGRESS;
-		}
-		else
-		{
-			ADXL_SetError(ADXL_DMA_PROBLEM);
-		}
-	}
-	else
-	{
-		CurrentState.CurrentStreamState = STREAM_ERROR;
-	}
-}
-
-
-void ADXL_DMAStreamComplete(void)
-{
-
-	if(CurrentState.DriverState == DRIVER_READY)
-	{
-		if(STREAM_IN_PROGRESS == CurrentState.CurrentStreamState)
-		{
-			if(CurrentState.readout_idx == (CurrentState.FifoSamplesNum-1))
-			{
-				CurrentState.CurrentStreamState = STREAM_COMPLETED;
-				CurrentState.readout_idx = 0;
-			}
-			else
-			{
-				CurrentState.readout_idx++;
-				if( HAL_I2C_Mem_Read_DMA(&hi2c1, ADEXL_ID, DATAX0_REG, 1, &(ADXL_raw_data[CurrentState.readout_idx * ONE_SAMPLE_SIZE]), ONE_SAMPLE_SIZE) == HAL_OK)
-				{
-					CurrentState.CurrentStreamState = STREAM_IN_PROGRESS;
-				}
-				else
-				{
-					ADXL_SetError(ADXL_DMA_PROBLEM);
-				}
-			}
-		}
-		else
-		{
-			CurrentState.CurrentStreamState = STREAM_ERROR;
-		}
-	}
-}
-
-/**
- * @brief Get Status of readout stream
- */
-ADXL_StreamStatus ADXL_GetStreamStatus(void)
-{
-	if(CurrentState.DriverState == DRIVER_READY)
-	{
-		return CurrentState.CurrentStreamState;
-	}
-	else
-	{
-		return STREAM_NOT_INITIALIZED;
-	}
-}
-
-/**
- * @brief Release buffer with samples
- */
-void ADXL_ReleaseDataBuffer(void)
-{
-	if(CurrentState.DriverState == DRIVER_READY)
-	{
-		CurrentState.CurrentStreamState = STREAM_IDLE;
-	}
-}
-
-/**
- * @brief Release buffer with samples
- * @returns NULL - in case of error
- * 			uint8_t* - address of buffer with samples - fixed size of 16
- */
-uint8_t* ADXL_GetStreamedData(void)
-{
-	uint8_t *ret_val = NULL;
-	if(CurrentState.DriverState == DRIVER_READY)
-	{
-		if(STREAM_COMPLETED == CurrentState.CurrentStreamState)
-		{
-			ret_val = ADXL_raw_data;
-		}
-	}
-	return ret_val;
-}
-#endif

@@ -70,5 +70,7 @@ ADXL_status_t ADXL_ResetDriver(void);
 ADXL_status_t ADXL_StartStreamMeasurements(void);
 ADXL_status_t ADXL_StopStreamMeasurements(void);
 
+void ADXL_task();
+
 
 #endif /* INC_ADXL_DRIVER_H_ */

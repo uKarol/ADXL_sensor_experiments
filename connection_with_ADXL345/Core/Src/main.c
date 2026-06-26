@@ -123,6 +123,7 @@ int main(void)
 
   while (1)
   {
+	  ADXL_task();
 	  MeasurementFSM_run(&measure_ctx);
 
 //	  if(ADXL_GetStreamStatus() == STREAM_COMPLETED)
