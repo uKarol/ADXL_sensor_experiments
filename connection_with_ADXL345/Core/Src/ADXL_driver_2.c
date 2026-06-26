@@ -74,10 +74,16 @@ volatile static ADXL_InternalState_t CurrentState = {DRIVER_NOT_INITIALIZED, ADX
 
 static void ADXL_SetEvent(ADXL_FSM_Events evt);
 
+// main stream fsm
 FSM_ret StreamCompleted_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 FSM_ret StreamInProgress_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 FSM_ret StreamError_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 FSM_ret StreamWaiting_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
+
+// sub stream fsm
+FSM_ret SubStreamIdle (fsm_context *ctx, FsmEvent_t *user_event);
+FSM_ret SubStreamCheckIntStatus (fsm_context *ctx, FsmEvent_t *user_event);
+FSM_ret SubStreamCheckFifo (fsm_context *ctx, FsmEvent_t *user_event);
 
 uint8_t ADXL_raw_data[MAX_READOUT_SIZE];
 
@@ -85,8 +91,122 @@ uint8_t ADXL_raw_data[MAX_READOUT_SIZE];
 SimpleQueue_t ADXL_queue;
 uint8_t adxl_queue_buffer[EVT_BUFFER_CAPACITY];
 
+typedef struct ADXL_driver_2
+{
+	ADXL_Errors_t last_error;
+	uint8_t expected_size;
+	uint8_t dma_out_data;
+}SubStreamdata_t;
+
+
 fsm_context StreamFsmContext;
 fsm_ctx_data StreamFsmData;
+
+SubStreamdata_t SubStreamFsmData;
+
+fsm_context SubStreamFsmContext;
+
+
+
+FSM_ret SubStreamIdle (fsm_context *ctx, FsmEvent_t *user_event)
+{
+	FSM_ret ret_val = FSM_OK;
+	ADXL_FSM_Events current_event = (ADXL_FSM_Events)user_event->user_event;
+	SubStreamdata_t *context_data = (SubStreamdata_t*)ctx->user_data;
+
+	switch (current_event)
+	{
+	case ADXL_EXTI_IRQ:
+		/* code */
+		if( HAL_I2C_Mem_Read_DMA(&hi2c1, ADEXL_ID, INT_SOURCE, 1, &(context_data->dma_out_data), 1) == HAL_OK)
+		{
+			ctx->current_state = SubStreamCheckIntStatus;
+		}
+		else
+		{
+			ret_val = FSM_ERROR;
+			context_data->last_error = ADXL_DMA_PROBLEM;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return ret_val;
+}
+
+FSM_ret SubStreamCheckIntStatus (fsm_context *ctx, FsmEvent_t *user_event)
+{
+	FSM_ret ret_val = FSM_OK;
+	ADXL_FSM_Events current_event = (ADXL_FSM_Events)user_event->user_event;
+	SubStreamdata_t *context_data = (SubStreamdata_t*)ctx->user_data;
+
+
+	switch (current_event)
+	{
+		case DMA_COMPLETED:
+			/* code */
+			if(context_data->dma_out_data & ADXL_INT_ENABLE_OVERRUN)
+			{
+				ADXL_SetEvent(ADXL_OVERRUN);
+				ctx->current_state = SubStreamIdle;
+				context_data->last_error = ADXL_OVERRUN;
+			}
+			else if(context_data->dma_out_data & ADXL_INT_ENABLE_WATERMARK)
+			{
+
+				if( HAL_I2C_Mem_Read_DMA(&hi2c1, ADEXL_ID, FIFO_STATUS, 1, &(context_data->dma_out_data), 1) == HAL_OK)
+				{
+					ctx->current_state = SubStreamCheckFifo;
+				}
+				else
+				{
+					ret_val = FSM_ERROR;
+					context_data->last_error = ADXL_DMA_PROBLEM;
+					ctx->current_state = SubStreamIdle;
+				}
+			}
+			break;
+		default:
+				ret_val = FSM_ERROR;
+				ctx->current_state = SubStreamIdle;
+			break;
+	}
+
+
+	return ret_val;
+}
+
+FSM_ret SubStreamCheckFifo (fsm_context *ctx, FsmEvent_t *user_event)
+{
+	FSM_ret ret_val = FSM_OK;
+	ADXL_FSM_Events current_event = (ADXL_FSM_Events)user_event->user_event;
+	SubStreamdata_t *context_data = (SubStreamdata_t*)ctx->user_data;
+
+	switch (current_event)
+	{
+		case DMA_COMPLETED:
+			/* code */
+			if((context_data->dma_out_data & FIFO_ENTRIES_BIT_MSK) >= context_data->expected_size)
+			{
+				ADXL_SetEvent(ADXL_FIFO_READY);
+				ctx->current_state = SubStreamIdle;
+			}
+			break;
+		default:
+			ret_val = FSM_ERROR;
+			ctx->current_state = SubStreamIdle;
+			break;
+	}
+
+	return ret_val;
+}
+
+
+static void SubStreamFsmInit()
+{
+	Fsm_Init(&SubStreamFsmContext, SubStreamIdle , &SubStreamFsmData);
+}
 
 /**
  * @brief Read single ADXL register in blockin (polling) mode
@@ -221,7 +341,7 @@ static ADXL_Errors_t ADXL_FlushFifoInternal()
 }
 
 
-void ADXL_Init()
+void ADXL_FSM_Init()
 {
 	SimpleQueueInit(&ADXL_queue, adxl_queue_buffer, EVT_BUFFER_CAPACITY);
 	Fsm_Init(&StreamFsmContext, StreamWaiting_StateHandler , &StreamFsmData);
@@ -251,57 +371,48 @@ void ADXL_task()
 FSM_ret StreamWaiting_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 {
 	FSM_ret ret_val = FSM_ERROR;
-	uint8_t out_val;
-	ADXL_ReadReg(INT_SOURCE, &out_val);
 
 	ADXL_FSM_Events current_event = (ADXL_FSM_Events)user_event->user_event;
 	fsm_ctx_data *context_data = (fsm_ctx_data*)ctx->user_data;
 
 	switch(current_event)
 	{
-		case ADXL_EXTI_IRQ:
-			if(out_val & ADXL_INT_ENABLE_OVERRUN)
+		case ADXL_EXTI_IRQ: // fallthrough
+		case DMA_COMPLETED:
+			if(Fsm_ProcessEvent(&SubStreamFsmContext, user_event) != FSM_OK )
 			{
+				SubStreamdata_t *subcontext_data = (SubStreamdata_t*)(SubStreamFsmContext.user_data);
 				ctx->current_state = StreamError_StateHandler;
-				context_data->stream_errors = ADXL_OVERRUN;
+				context_data->stream_errors = subcontext_data->last_error;
+				context_data->current_state = STREAM_ERROR;
 				ADXL_SetEvent(ERROR_OCCURED);
 			}
-			else if(out_val & ADXL_INT_ENABLE_WATERMARK)
+			else
 			{
-				if(ADXL_ReadReg(FIFO_STATUS, &out_val) == ADXL_NO_ERROR)
-				{
-					if((out_val & FIFO_ENTRIES_BIT_MSK) >= context_data->fifo_samples_num )
-					{
-						if( HAL_I2C_Mem_Read_DMA(&hi2c1, ADEXL_ID, DATAX0_REG, 1, ADXL_raw_data, ONE_SAMPLE_SIZE) == HAL_OK)
-						{
-							ctx->current_state = StreamInProgress_StateHandler;
-							context_data->current_state = STREAM_IN_PROGRESS;
-						}
-					}
-					else
-					{
-						ctx->current_state = StreamError_StateHandler;
-						context_data->stream_errors = ADXL_READOUT_INCOMPLETE;
-						context_data->current_state = STREAM_ERROR;
-						ADXL_SetEvent(ERROR_OCCURED);
-					}
-				}
-				else
-				{
-					ctx->current_state = StreamError_StateHandler;
-					context_data->stream_errors = ADXL_COMMUNICATION_LOST;
-					context_data->current_state = STREAM_ERROR;
-					ADXL_SetEvent(ERROR_OCCURED);
-				}
+				ret_val = FSM_OK;
+			}
+			break;
+		case ADXL_FIFO_READY:
+
+			if( HAL_I2C_Mem_Read_DMA(&hi2c1, ADEXL_ID, DATAX0_REG, 1, ADXL_raw_data, ONE_SAMPLE_SIZE) == HAL_OK)
+			{
+				ctx->current_state = StreamInProgress_StateHandler;
+				context_data->current_state = STREAM_IN_PROGRESS;
+				ret_val = FSM_OK;
 			}
 			else
 			{
 				ctx->current_state = StreamError_StateHandler;
-				context_data->stream_errors = ADXL_UNEXPECTED_BEHAVIOUR;
+				context_data->stream_errors = ADXL_COMMUNICATION_LOST;
 				context_data->current_state = STREAM_ERROR;
 				ADXL_SetEvent(ERROR_OCCURED);
 			}
+			break;
 		default:
+			ctx->current_state = StreamError_StateHandler;
+			context_data->stream_errors = ADXL_UNEXPECTED_BEHAVIOUR;
+			context_data->current_state = STREAM_ERROR;
+			ADXL_SetEvent(ERROR_OCCURED);
 			break;
 
 	}
@@ -580,8 +691,10 @@ ADXL_status_t ADXL_RegInitAlternative(ADXL_Init_t *init_data)
 		{
 			CurrentState.DriverState = DRIVER_HALTED;
 			StreamFsmData.fifo_samples_num = init_data->FifoSamples;
+			SubStreamFsmData.expected_size = init_data->FifoSamples;
 			ret_val = ADXL_SUCCESS;
-			ADXL_Init();
+			ADXL_FSM_Init();
+			SubStreamFsmInit();
 		}
 		else
 		{
