@@ -19,13 +19,13 @@ typedef enum
 
 typedef enum
 {
-	ADXL_NO_ERROR,
-	ADXL_OVERRUN,				// recoverable
-	ADXL_READOUT_INCOMPLETE,	// recoverable
-	ADXL_COMMUNICATION_LOST,	// not recoverable, reinit required
-	ADXL_DMA_PROBLEM,			// not recoverable, reinit required
-	ADXL_UNEXPECTED_BEHAVIOUR,	// not recoverable, reinit required
-	ADXL_UNEXPECTED_REG_VAL		// not recoverable, reinit required
+	ADXL_ERR_NO_ERROR,
+	ADXL_ERR_OVERRUN,				// recoverable
+	ADXL_ERR_READOUT_INCOMPLETE,	// recoverable
+	ADXL_ERR_COMMUNICATION_LOST,	// not recoverable, reinit required
+	ADXL_ERR_DMA_PROBLEM,			// not recoverable, reinit required
+	ADXL_ERR_UNEXPECTED_BEHAVIOUR,	// not recoverable, reinit required
+	ADXL_ERR_UNEXPECTED_REG_VAL		// not recoverable, reinit required
 }ADXL_Errors_t;
 
 typedef enum

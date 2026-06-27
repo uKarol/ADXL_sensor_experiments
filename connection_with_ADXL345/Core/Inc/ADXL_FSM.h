@@ -10,24 +10,24 @@
 
 typedef enum
 {
-	ADXL_EXTI_IRQ,
-	DMA_COMPLETED,
-	ADXL_FIFO_OVERRUN,
-	ADXL_FIFO_READY,
-	BUFFER_RELEASE_REQUEST,
-	FSM_RESET,
-	ERROR_OCCURED,
-	STREAM_FINISHED,
-	RESET_ERROR_REQUEST,
+	ADXL_EVT_EXTI_IRQ,
+	ADXL_EVT_DMA_COMPLETED,	// interpreted by current FSM state: INT_SOURCE/FIFO_STATUS/sample read completed
+	ADXL_EVT_FIFO_OVERRUN,
+	ADXL_EVT_FIFO_READY,
+	ADXL_EVT_BUFFER_RELEASE_REQ,
+	ADXL_EVT_FSM_RESET,
+	ADXL_EVT_ERROR_OCCURED,
+	ADXL_EVT_STREAM_FINISHED,
+	ADXL_EVT_RESET_ERROR_REQUEST,
 }ADXL_FSM_Events;
 
 typedef void (*fsm_error_callback)(ADXL_Errors_t CurrentError);
+typedef void (*fsm_set_event_callback)(ADXL_FSM_Events evt);
 
 #define EVT_BUFFER_CAPACITY (10U * sizeof(FsmEvent_t))
 
 uint8_t* ADXL_FSM_GetDataBuffer(void);
-void ADXL_FSM_Init(uint8_t fifo_samples, fsm_error_callback error_cb);
-void ADXL_SetEvent(ADXL_FSM_Events evt);
+void ADXL_FSM_Init(uint8_t fifo_samples, fsm_error_callback error_cb, fsm_set_event_callback event_cb);
 void ADXL_FSM_ProcessEvent(FsmEvent_t *user_event);
 ADXL_StreamStatus ADXL_FSM_GetStatus(void);
 

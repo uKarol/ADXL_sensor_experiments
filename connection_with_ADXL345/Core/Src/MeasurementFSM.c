@@ -21,7 +21,7 @@ void MeasurementFSM_setup(MeasurementFSM_context_t *context, MeasurementInitStru
 	if( ADXL_RegInitAlternative(&init_struct) == ADXL_SUCCESS )
 	{
 		context->current_state = MEASURE_WAITING;
-		context->current_error = ADXL_NO_ERROR;
+		context->current_error = ADXL_ERR_NO_ERROR;
 	}
 	else
 	{

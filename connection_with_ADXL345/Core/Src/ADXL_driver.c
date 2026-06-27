@@ -54,7 +54,7 @@ typedef struct
     uint32_t readout_problem_cnt;
 }ADXL_InternalState_t;
 
-volatile static ADXL_InternalState_t CurrentState = {DRIVER_NOT_INITIALIZED, ADXL_NO_ERROR, STREAM_IDLE, 0, 0};
+volatile static ADXL_InternalState_t CurrentState = {DRIVER_NOT_INITIALIZED, ADXL_ERR_NO_ERROR, STREAM_IDLE, 0, 0};
 uint8_t ADXL_raw_data[MAX_READOUT_SIZE];
 
 /*
@@ -70,9 +70,9 @@ static bool ADXL_IsErrRecoveravle(ADXL_Errors_t curr_err)
 {
 	switch(curr_err)
 	{
-		case ADXL_NO_ERROR:				// fallthrough
-		case ADXL_OVERRUN:				// fallthrough
-		case ADXL_READOUT_INCOMPLETE:
+		case ADXL_ERR_NO_ERROR:				// fallthrough
+		case ADXL_ERR_OVERRUN:				// fallthrough
+		case ADXL_ERR_READOUT_INCOMPLETE:
 			return true;
 		default:
 			return false;
@@ -103,11 +103,11 @@ ADXL_Errors_t ADXL_GetLastError(void)
  */
 static ADXL_Errors_t ADXL_ReadReg(uint8_t reg_id, uint8_t *pValueOut)
 {
-	ADXL_Errors_t ret_val = ADXL_NO_ERROR;
+	ADXL_Errors_t ret_val = ADXL_ERR_NO_ERROR;
 
 	if(HAL_I2C_Mem_Read(&hi2c1, ADEXL_ID, reg_id, 1, pValueOut, 1, 100) != HAL_OK)
 	{
-		ret_val = ADXL_COMMUNICATION_LOST;
+		ret_val = ADXL_ERR_COMMUNICATION_LOST;
 	}
 
 	return ret_val;
@@ -122,10 +122,10 @@ static ADXL_Errors_t ADXL_ReadReg(uint8_t reg_id, uint8_t *pValueOut)
  */
 static ADXL_Errors_t ADXL_WriteReg(uint8_t reg_id, uint8_t DataIn)
 {
-	ADXL_Errors_t ret_val = ADXL_NO_ERROR;
+	ADXL_Errors_t ret_val = ADXL_ERR_NO_ERROR;
 	if(HAL_I2C_Mem_Write(&hi2c1, ADEXL_ID, reg_id, 1, &DataIn, 1, 100) != HAL_OK)
 	{
-		ret_val = ADXL_COMMUNICATION_LOST;
+		ret_val = ADXL_ERR_COMMUNICATION_LOST;
 	}
 	return ret_val;
 }
@@ -136,35 +136,35 @@ static ADXL_Errors_t ADXL_WriteReg(uint8_t reg_id, uint8_t DataIn)
  */
 static ADXL_Errors_t ADXL_RegSequencer(const RegConfDesc *reg_sequence, uint8_t seq_size, uint8_t *failed_step)
 {
-	ADXL_Errors_t ret_val = ADXL_NO_ERROR;
+	ADXL_Errors_t ret_val = ADXL_ERR_NO_ERROR;
 
 	for(uint8_t i =0; i < seq_size; i++)
 	{
 		if(reg_sequence[i].reg_op == WRITE_REG )
 		{
-			if( ADXL_WriteReg(reg_sequence[i].reg_addr, reg_sequence[i].reg_val) != ADXL_NO_ERROR )
+			if( ADXL_WriteReg(reg_sequence[i].reg_addr, reg_sequence[i].reg_val) != ADXL_ERR_NO_ERROR )
 			{
 				*failed_step = i;
-				ret_val = ADXL_COMMUNICATION_LOST;
+				ret_val = ADXL_ERR_COMMUNICATION_LOST;
 				break;
 			}
 		}
 		else
 		{
 			uint8_t axdl_out_val;
-			if( ADXL_ReadReg(reg_sequence[i].reg_addr, &axdl_out_val) == ADXL_NO_ERROR )
+			if( ADXL_ReadReg(reg_sequence[i].reg_addr, &axdl_out_val) == ADXL_ERR_NO_ERROR )
 			{
 				if(axdl_out_val != reg_sequence[i].reg_val)
 				{
 					*failed_step = i;
-					ret_val = ADXL_UNEXPECTED_REG_VAL;
+					ret_val = ADXL_ERR_UNEXPECTED_REG_VAL;
 					break;
 				}
 			}
 			else
 			{
 				*failed_step = i;
-				ret_val = ADXL_COMMUNICATION_LOST;
+				ret_val = ADXL_ERR_COMMUNICATION_LOST;
 				break;
 			}
 		}
@@ -174,10 +174,10 @@ static ADXL_Errors_t ADXL_RegSequencer(const RegConfDesc *reg_sequence, uint8_t 
 
 static ADXL_Errors_t ADXL_FlushFifoInternal()
 {
-	ADXL_Errors_t ret_val = ADXL_NO_ERROR;
+	ADXL_Errors_t ret_val = ADXL_ERR_NO_ERROR;
 	uint8_t out_val;
 	ADXL_Errors_t reg_status = ADXL_ReadReg(FIFO_STATUS, &out_val) ;
-	if(reg_status == ADXL_NO_ERROR)
+	if(reg_status == ADXL_ERR_NO_ERROR)
 	{
 		uint8_t samples_to_flush = out_val & FIFO_ENTRIES_BIT_MSK;
 
@@ -185,11 +185,11 @@ static ADXL_Errors_t ADXL_FlushFifoInternal()
 		for(uint8_t i = 0; i< samples_to_flush; i++){
 			if(HAL_I2C_Mem_Read(&hi2c1, ADEXL_ID, DATAX0_REG, 1, data_regs, 6, 1000) != HAL_OK)
 			{
-				ret_val = ADXL_COMMUNICATION_LOST;
+				ret_val = ADXL_ERR_COMMUNICATION_LOST;
 				break;
 			}
 		}
-		if(ret_val == ADXL_NO_ERROR)
+		if(ret_val == ADXL_ERR_NO_ERROR)
 		{
 			CurrentState.CurrentStreamState = STREAM_IDLE;
 		}
@@ -213,7 +213,7 @@ ADXL_status_t ADXL_FlushFifo()
 	if(CurrentState.DriverState == DRIVER_READY)
 	{
 		ADXL_Errors_t fifo_status = ADXL_FlushFifoInternal();
-		if(fifo_status == ADXL_NO_ERROR)
+		if(fifo_status == ADXL_ERR_NO_ERROR)
 		{
 			ret_val = ADXL_SUCCESS;
 		}
@@ -243,10 +243,10 @@ ADXL_status_t ADXL_StartStreamMeasurements(void)
 	{
 		ADXL_Errors_t reg_status = ADXL_WriteReg(POWER_CTL, POWER_CTL_MEASURE);
 		HAL_Delay(100);
-		if(reg_status == ADXL_NO_ERROR)
+		if(reg_status == ADXL_ERR_NO_ERROR)
 		{
 			ADXL_Errors_t FifoState = ADXL_FlushFifoInternal();
-			if(FifoState == ADXL_NO_ERROR)
+			if(FifoState == ADXL_ERR_NO_ERROR)
 			{
 				CurrentState.DriverState = DRIVER_READY;
 				CurrentState.CurrentStreamState = STREAM_IDLE;
@@ -271,7 +271,7 @@ ADXL_status_t ADXL_StopStreamMeasurements(void)
 	if(CurrentState.DriverState == DRIVER_READY)
 	{
 		ADXL_Errors_t reg_status = ADXL_WriteReg(POWER_CTL, 0x0);
-		if(reg_status == ADXL_NO_ERROR)
+		if(reg_status == ADXL_ERR_NO_ERROR)
 		{
 			CurrentState.DriverState = DRIVER_HALTED;
 			ret_val = ADXL_SUCCESS;
@@ -313,7 +313,7 @@ ADXL_status_t ADXL_RegInitAlternative(ADXL_Init_t *init_data)
 		uint8_t failed_step = 0xFF;
 		uint8_t sequence_size = sizeof(reg_init_sequence)/sizeof(reg_init_sequence[0]);
 		ADXL_Errors_t SeqState = ADXL_RegSequencer(reg_init_sequence, sequence_size, &failed_step);
-		if( SeqState == ADXL_NO_ERROR )
+		if( SeqState == ADXL_ERR_NO_ERROR )
 		{
 			CurrentState.DriverState = DRIVER_HALTED;
 			CurrentState.FifoSamplesNum = init_data->FifoSamples;
@@ -329,7 +329,7 @@ ADXL_status_t ADXL_RegInitAlternative(ADXL_Init_t *init_data)
 	else
 	{
 		ret_val = ADXL_FAILURE; // sensor not respond
-		ADXL_SetError(ADXL_COMMUNICATION_LOST);
+		ADXL_SetError(ADXL_ERR_COMMUNICATION_LOST);
 	}
 
 	return ret_val;
@@ -356,13 +356,13 @@ ADXL_status_t ADXL_GetConfig(char *readout, uint16_t max_size)
 		for(uint8_t i = 0; i<REG_READ_NO; i++)
 		{
 			uint8_t temp_val;
-			if( ADXL_ReadReg(ReadoutRegs[i].reg_addr, &temp_val) == ADXL_NO_ERROR)
+			if( ADXL_ReadReg(ReadoutRegs[i].reg_addr, &temp_val) == ADXL_ERR_NO_ERROR)
 			{
 				offset += snprintf(&(readout[offset]), max_size-offset, "%s %d\n", ReadoutRegs[i].reg_name, temp_val);
 			}
 			else
 			{
-				ADXL_SetError(ADXL_COMMUNICATION_LOST);
+				ADXL_SetError(ADXL_ERR_COMMUNICATION_LOST);
 				ret_val = ADXL_FAILURE;
 				break;
 			}
@@ -396,7 +396,7 @@ ADXL_status_t ADXL_ReadData(int16_t *Xdata, int16_t *Ydata, int16_t *Zdata)
 		}
 		else
 		{
-			ADXL_SetError(ADXL_COMMUNICATION_LOST);
+			ADXL_SetError(ADXL_ERR_COMMUNICATION_LOST);
 		}
 	}
 	else
@@ -414,11 +414,11 @@ void ADXL_FIFO_Check(void)
 	if(CurrentState.DriverState == DRIVER_READY)
 	{
 		uint8_t data_out;
-		if(ADXL_ReadReg(FIFO_STATUS, &data_out) == ADXL_NO_ERROR)
+		if(ADXL_ReadReg(FIFO_STATUS, &data_out) == ADXL_ERR_NO_ERROR)
 		{
 			dbg_ctr++;
 		}
-		if(ADXL_ReadReg(INT_SOURCE, &data_out) == ADXL_NO_ERROR)
+		if(ADXL_ReadReg(INT_SOURCE, &data_out) == ADXL_ERR_NO_ERROR)
 		{
 			if(data_out != 0)
 			{
@@ -432,7 +432,7 @@ void ADXL_FIFO_Check(void)
 			}
 
 		}
-		if(ADXL_ReadReg(INT_SOURCE, &data_out) == ADXL_NO_ERROR)
+		if(ADXL_ReadReg(INT_SOURCE, &data_out) == ADXL_ERR_NO_ERROR)
 		{
 			ADXL_ReadReg(FIFO_STATUS, &data_out);
 			dbg_ctr++;
@@ -450,12 +450,12 @@ void ADXL_INT1InterruptHandler(void)
 		{
 			// overrun occured
 			CurrentState.fifo_overrun_cnt++;
-			ADXL_SetError(ADXL_OVERRUN);
+			ADXL_SetError(ADXL_ERR_OVERRUN);
 			CurrentState.CurrentStreamState = STREAM_ERROR;
 		}
 		else if(out_val & ADXL_INT_ENABLE_WATERMARK)
 		{
-			if(ADXL_ReadReg(FIFO_STATUS, &out_val) == ADXL_NO_ERROR)
+			if(ADXL_ReadReg(FIFO_STATUS, &out_val) == ADXL_ERR_NO_ERROR)
 			{
 				if((out_val & FIFO_ENTRIES_BIT_MSK) >= CurrentState.FifoSamplesNum )
 				{
@@ -464,18 +464,18 @@ void ADXL_INT1InterruptHandler(void)
 				else
 				{
 					CurrentState.CurrentStreamState = STREAM_ERROR;
-					ADXL_SetError(ADXL_READOUT_INCOMPLETE);
+					ADXL_SetError(ADXL_ERR_READOUT_INCOMPLETE);
 					CurrentState.readout_problem_cnt++;
 				}
 			}
 			else
 			{
-				ADXL_SetError(ADXL_COMMUNICATION_LOST);
+				ADXL_SetError(ADXL_ERR_COMMUNICATION_LOST);
 			}
 		}
 		else
 		{
-			ADXL_SetError(ADXL_UNEXPECTED_BEHAVIOUR);
+			ADXL_SetError(ADXL_ERR_UNEXPECTED_BEHAVIOUR);
 		}
 	}
 }
@@ -494,7 +494,7 @@ void ADXL_StreamRead(void)
 		}
 		else
 		{
-			ADXL_SetError(ADXL_DMA_PROBLEM);
+			ADXL_SetError(ADXL_ERR_DMA_PROBLEM);
 		}
 	}
 	else
@@ -525,7 +525,7 @@ void ADXL_DMAStreamComplete(void)
 				}
 				else
 				{
-					ADXL_SetError(ADXL_DMA_PROBLEM);
+					ADXL_SetError(ADXL_ERR_DMA_PROBLEM);
 				}
 			}
 		}
