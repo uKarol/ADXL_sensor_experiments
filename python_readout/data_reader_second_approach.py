@@ -13,6 +13,7 @@ Z_OFFSET = -36.79
 
 WATERMARK_SIZE = 16
 ONE_SAMPLE_SIZE = 6
+SAMPLES_NUM = 20
 
 with serial.Serial("COM5", 115200, timeout= 2) as ser:
 
@@ -21,10 +22,12 @@ with serial.Serial("COM5", 115200, timeout= 2) as ser:
     ser.flush()
     start_str = ser.read(5)
     print(start_str)
-    number_of_samples = 20
+    number_of_samples = SAMPLES_NUM
     datasize = number_of_samples.to_bytes(2, byteorder="big")
     num = ser.write(datasize)
-    containers = [[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
+    containers = []
+    for i in range(0, WATERMARK_SIZE):
+        containers.append([])
     samples = []
     for j in range (0, number_of_samples):
         line = ser.readline().decode()

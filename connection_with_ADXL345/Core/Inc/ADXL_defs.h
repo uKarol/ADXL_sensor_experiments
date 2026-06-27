@@ -44,4 +44,7 @@
 #define ADFL_FIFO_16_SAMPLES (1U<<4)
 #define ADFL_FIFO_8_SAMPLES (1U<<3)
 
+#define MAX_NUMBER_OF_SAMPLES 32U // number of samples per watermark
+#define MAX_READOUT_SIZE (ONE_SAMPLE_SIZE * MAX_NUMBER_OF_SAMPLES)
+
 #endif /* INC_ADXL_DEFS_H_ */
