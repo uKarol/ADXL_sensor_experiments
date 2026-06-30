@@ -33,7 +33,7 @@ ADXL_Operation_t ADXLConn_GetCurrentOperation();
 
 ADXL_Errors_t ADXL_ReadMultipleRegsNonBlocking(uint8_t reg_id, uint8_t *pValueOut, uint8_t size);
 ADXL_Errors_t ADXL_ReadRegNonBlocking(uint8_t reg_id, uint8_t *pValueOut);
-ADXL_Errors_t ADXL_WriteRegNonBlocking(uint8_t reg_id, uint8_t DataIn);
+ADXL_Errors_t ADXL_WriteRegNonBlocking(uint8_t reg_id, uint8_t *DataIn);
 
 ADXL_Errors_t ADXL_ReadRegBlocking(uint8_t reg_id, uint8_t *pValueOut);
 ADXL_Errors_t ADXL_WriteRegBlocking(uint8_t reg_id, uint8_t DataIn);

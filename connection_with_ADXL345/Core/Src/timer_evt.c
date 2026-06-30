@@ -32,5 +32,6 @@ void EvtTimerInit(timer_cb callback)
 void EvtTimerStart(uint8_t period)
 {
 	timer_period = period;
+	period_ctr = 0;
 	HAL_TIM_Base_Start_IT(&htim6);
 }

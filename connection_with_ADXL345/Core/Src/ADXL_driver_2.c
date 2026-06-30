@@ -204,6 +204,7 @@ ADXL_status_t ADXL_StartStreamMeasurements(void)
 	{
 		ADXL_SetEvent(ADXL_EVT_START_STREAM);
 		CurrentState.DriverState = DRIVER_READY;
+		ret_val = ADXL_SUCCESS;
 	}
 	return ret_val;
 }

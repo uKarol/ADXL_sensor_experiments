@@ -44,6 +44,8 @@ ADXL_Errors_t ADXL_FSMHalted_GetError()
 	return StreamHaltedFsmData.last_error;
 }
 
+volatile uint8_t data_in;
+
 static FSM_ret StreamHalted_IdleStateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 {
 	FSM_ret ret_val = FSM_OK;
@@ -53,7 +55,8 @@ static FSM_ret StreamHalted_IdleStateHandler (fsm_context *ctx, FsmEvent_t *user
 	switch (current_event)
 	{
 		case ADXL_EVT_START_STREAM:
-			if(ADXL_WriteRegNonBlocking(POWER_CTL, POWER_CTL_MEASURE) == ADXL_ERR_NO_ERROR)
+			data_in = POWER_CTL_MEASURE;
+			if(ADXL_WriteRegNonBlocking(POWER_CTL, &data_in) == ADXL_ERR_NO_ERROR)
 			{
 				ctx->current_state = StreamHalted_SettingPowerCTL;
 			}
@@ -69,7 +72,7 @@ static FSM_ret StreamHalted_IdleStateHandler (fsm_context *ctx, FsmEvent_t *user
 
 	return ret_val;
 }
-uint8_t helper_data;
+volatile uint8_t helper_data;
 static FSM_ret StreamHalted_SettingPowerCTL (fsm_context *ctx, FsmEvent_t *user_event)
 {
 	FSM_ret ret_val = FSM_OK;
@@ -81,13 +84,26 @@ static FSM_ret StreamHalted_SettingPowerCTL (fsm_context *ctx, FsmEvent_t *user_
 		case ADXL_EVT_I2C_TX_COMPLETED:
 
 
-			ADXL_ReadRegNonBlocking(POWER_CTL, &helper_data);
+			if(ADXL_ReadRegNonBlocking(POWER_CTL, &helper_data)!= ADXL_ERR_NO_ERROR)
+			{
+				ret_val = FSM_ERROR;
+				context_data->last_error = ADXL_ERR_COMMUNICATION_LOST;
+				ctx->current_state = StreamHalted_IdleStateHandler;
+			}
 
 			break;
 		case ADXL_EVT_I2C_RX_COMPLETED:
-			EvtTimerStart(100);
-			ctx->current_state = StreamHalted_Waiting;
-			break;
+			if(helper_data == POWER_CTL_MEASURE)
+			{
+				EvtTimerStart(100);
+				ctx->current_state = StreamHalted_Waiting;
+				break;
+			}
+			else
+			{
+
+			} // fallthrough
+
 		default:
 			ret_val = FSM_ERROR;
 			context_data->last_error = ADXL_ERR_UNEXPECTED_BEHAVIOUR;

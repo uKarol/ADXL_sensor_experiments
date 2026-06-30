@@ -93,12 +93,12 @@ ADXL_Errors_t ADXL_ReadRegNonBlocking(uint8_t reg_id, uint8_t *pValueOut)
 	return ret_val;
 }
 
-ADXL_Errors_t ADXL_WriteRegNonBlocking(uint8_t reg_id, uint8_t DataIn)
+ADXL_Errors_t ADXL_WriteRegNonBlocking(uint8_t reg_id, uint8_t *DataIn)
 {
 	ADXL_Errors_t ret_val = ADXL_ERR_COMMUNICATION_LOST;
 	if(Current_operation == ADXL_OP_NO_OPERATION)
 	{
-		if(HAL_I2C_Mem_Write_IT(&hi2c1, ADEXL_ID, reg_id, 1, &DataIn, 1) == HAL_OK)
+		if(HAL_I2C_Mem_Write_IT(&hi2c1, ADEXL_ID, reg_id, 1, DataIn, 1) == HAL_OK)
 		{
 			ret_val = ADXL_ERR_NO_ERROR;
 			Current_operation = ADXL_WRITE_SINGLE_REG;
