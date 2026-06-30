@@ -13,6 +13,7 @@
 #include "stdio.h"
 #include "stdbool.h"
 #include "ADXL_FSM.h"
+#include "ADXL_i2c_conn.h"
 
 #define DEV_ID_REG 0U
 #define DEV_ID 0xE5
@@ -84,35 +85,6 @@ static inline void ADXL_SetError(ADXL_Errors_t CurrentError)
 	}
 }
 
-static ADXL_Errors_t ADXL_ReadReg(uint8_t reg_id, uint8_t *pValueOut)
-{
-	ADXL_Errors_t ret_val = ADXL_ERR_NO_ERROR;
-
-	if(HAL_I2C_Mem_Read(&hi2c1, ADEXL_ID, reg_id, 1, pValueOut, 1, 100) != HAL_OK)
-	{
-		ret_val = ADXL_ERR_COMMUNICATION_LOST;
-	}
-
-	return ret_val;
-}
-
-/**
- * @brief Read single ADXL register in blockin (polling) mode
- * @param in uint8_t ADXL register address
- * @param in uint8_t value to be written into register
- * @returns ADXL_SUCCESS in case of successful operation
- * 			ADXL_FAILURE in case of error
- */
-static ADXL_Errors_t ADXL_WriteReg(uint8_t reg_id, uint8_t DataIn)
-{
-	ADXL_Errors_t ret_val = ADXL_ERR_NO_ERROR;
-	if(HAL_I2C_Mem_Write(&hi2c1, ADEXL_ID, reg_id, 1, &DataIn, 1, 100) != HAL_OK)
-	{
-		ret_val = ADXL_ERR_COMMUNICATION_LOST;
-	}
-	return ret_val;
-}
-
 
 /*
  * @brief write or check sequence of registers in blocking mode
@@ -126,7 +98,7 @@ static ADXL_Errors_t ADXL_RegSequencer(const RegConfDesc *reg_sequence, uint8_t 
 	{
 		if(reg_sequence[i].reg_op == WRITE_REG )
 		{
-			if( ADXL_WriteReg(reg_sequence[i].reg_addr, reg_sequence[i].reg_val) != ADXL_ERR_NO_ERROR )
+			if( ADXL_WriteRegBlocking(reg_sequence[i].reg_addr, reg_sequence[i].reg_val) != ADXL_ERR_NO_ERROR )
 			{
 				*failed_step = i;
 				ret_val = ADXL_ERR_COMMUNICATION_LOST;
@@ -136,7 +108,7 @@ static ADXL_Errors_t ADXL_RegSequencer(const RegConfDesc *reg_sequence, uint8_t 
 		else
 		{
 			uint8_t axdl_out_val;
-			if( ADXL_ReadReg(reg_sequence[i].reg_addr, &axdl_out_val) == ADXL_ERR_NO_ERROR )
+			if( ADXL_ReadRegBlocking(reg_sequence[i].reg_addr, &axdl_out_val) == ADXL_ERR_NO_ERROR )
 			{
 				if(axdl_out_val != reg_sequence[i].reg_val)
 				{
@@ -156,36 +128,6 @@ static ADXL_Errors_t ADXL_RegSequencer(const RegConfDesc *reg_sequence, uint8_t 
 	return ret_val;
 }
 
-static ADXL_Errors_t ADXL_FlushFifoInternal()
-{
-	ADXL_Errors_t ret_val = ADXL_ERR_NO_ERROR;
-	uint8_t out_val;
-	ADXL_Errors_t reg_status = ADXL_ReadReg(FIFO_STATUS, &out_val) ;
-	if(reg_status == ADXL_ERR_NO_ERROR)
-	{
-		uint8_t samples_to_flush = out_val & FIFO_ENTRIES_BIT_MSK;
-
-		uint8_t data_regs[6];
-		for(uint8_t i = 0; i< samples_to_flush; i++){
-			if(HAL_I2C_Mem_Read(&hi2c1, ADEXL_ID, DATAX0_REG, 1, data_regs, 6, 1000) != HAL_OK)
-			{
-				ret_val = ADXL_ERR_COMMUNICATION_LOST;
-				break;
-			}
-		}
-		if(ret_val == ADXL_ERR_NO_ERROR)
-		{
-			//ADXL_SetEvent(ADXL_EVT_RESET_ERROR_REQUEST);
-		}
-	}
-	else
-	{
-		ret_val = reg_status;
-	}
-	return ret_val;
-}
-
-
 void ADXL_task()
 {
 	FsmEvent_t current_event;
@@ -204,15 +146,6 @@ void ADXL_INT1InterruptHandler(void)
 	if(CurrentState.DriverState == DRIVER_READY)
 	{
 		ADXL_SetEvent(ADXL_EVT_EXTI_IRQ);
-	}
-}
-
-void ADXL_DMAStreamComplete(void)
-{
-
-	if(CurrentState.DriverState == DRIVER_READY)
-	{
-		ADXL_SetEvent(ADXL_EVT_DMA_COMPLETED);
 	}
 }
 
@@ -257,34 +190,6 @@ uint8_t* ADXL_GetStreamedData(void)
 	return ret_val;
 }
 
-/**
- * @brief Read all data from ADXL in order to clear FIFO (in blocking mode), this function should be called after init or overrun
- * @returns ADXL_SUCCESS in case of successful operation
- * 			ADXL_FAILURE in case of error
- */
-ADXL_status_t ADXL_FlushFifo()
-{
-	ADXL_status_t ret_val = ADXL_SUCCESS;
-	// FIFO may be used during initialization of a driver or during runtime
-	if(CurrentState.DriverState == DRIVER_READY)
-	{
-		ADXL_Errors_t fifo_status = ADXL_FlushFifoInternal();
-		if(fifo_status == ADXL_ERR_NO_ERROR)
-		{
-			ret_val = ADXL_SUCCESS;
-		}
-		else
-		{
-			ADXL_SetError(fifo_status);
-			ret_val = ADXL_FAILURE;
-		}
-	}
-	else
-	{
-		ret_val = ADXL_NOT_INITIALIZED;
-	}
-	return ret_val;
-}
 
 ADXL_status_t ADXL_ResetDriver(void)
 {
@@ -297,25 +202,8 @@ ADXL_status_t ADXL_StartStreamMeasurements(void)
 	ADXL_status_t ret_val = ADXL_FAILURE;
 	if(CurrentState.DriverState == DRIVER_HALTED)
 	{
-		ADXL_Errors_t reg_status = ADXL_WriteReg(POWER_CTL, POWER_CTL_MEASURE);
-		HAL_Delay(100);
-		if(reg_status == ADXL_ERR_NO_ERROR)
-		{
-			ADXL_Errors_t FifoState = ADXL_FlushFifoInternal();
-			if(FifoState == ADXL_ERR_NO_ERROR)
-			{
-				CurrentState.DriverState = DRIVER_READY;
-				ret_val = ADXL_SUCCESS;
-			}
-			else
-			{
-				ADXL_SetError(FifoState);
-			}
-		}
-		else
-		{
-			ADXL_SetError(reg_status);
-		}
+		ADXL_SetEvent(ADXL_EVT_START_STREAM);
+		CurrentState.DriverState = DRIVER_READY;
 	}
 	return ret_val;
 }
@@ -324,7 +212,7 @@ ADXL_status_t ADXL_StopStreamMeasurements(void)
 	ADXL_status_t ret_val = ADXL_FAILURE;
 	if(CurrentState.DriverState == DRIVER_READY)
 	{
-		ADXL_Errors_t reg_status = ADXL_WriteReg(POWER_CTL, 0x0);
+		ADXL_Errors_t reg_status = ADXL_WriteRegBlocking(POWER_CTL, 0x0);
 		if(reg_status == ADXL_ERR_NO_ERROR)
 		{
 			CurrentState.DriverState = DRIVER_HALTED;
@@ -338,6 +226,23 @@ ADXL_status_t ADXL_StopStreamMeasurements(void)
 	return ret_val;
 }
 
+void ADXL_ConnCallback(ADXL_ConnEvt evt)
+{
+	switch(evt)
+	{
+	case SINGLE_REG_WRITE_FINISH:
+		ADXL_SetEvent(ADXL_EVT_I2C_TX_COMPLETED);
+		break;
+	case SINGLE_REG_READ_FINISH: // fallthrough
+	case MULTIPLE_REGS_READ_FINISH:
+		ADXL_SetEvent(ADXL_EVT_I2C_RX_COMPLETED);
+		break;
+	case UNEXPECTED_EVT:
+		ADXL_SetEvent(ADXL_EVT_ERROR_OCCURED);
+		break;
+	}
+}
+
 /**
  * @brief default function to perform initialization of ADXL module
  * @returns ADXL_SUCCESS in case of successful operation
@@ -346,7 +251,7 @@ ADXL_status_t ADXL_StopStreamMeasurements(void)
 ADXL_status_t ADXL_RegInitAlternative(ADXL_Init_t *init_data)
 {
 	ADXL_status_t ret_val = ADXL_SUCCESS;
-
+	ADXLConn_Init(ADXL_ConnCallback);
 	RegConfDesc reg_init_sequence[] = {
 			{DEV_ID_REG, DEV_ID, VERIFY_REG},										// read DEV ID reg - check if device has proper ID
 			{FIFO_CTL, ADXL_FIFO_CTL_STREAM | (init_data->FifoSamples & FIFO_CTL_SAMPLES_MASK), WRITE_REG},	// configure FIFO - set mode stream, set wartemark to 16 samples
@@ -411,7 +316,7 @@ ADXL_status_t ADXL_GetConfig(char *readout, uint16_t max_size)
 		for(uint8_t i = 0; i<REG_READ_NO; i++)
 		{
 			uint8_t temp_val;
-			if( ADXL_ReadReg(ReadoutRegs[i].reg_addr, &temp_val) == ADXL_ERR_NO_ERROR)
+			if( ADXL_ReadRegBlocking(ReadoutRegs[i].reg_addr, &temp_val) == ADXL_ERR_NO_ERROR)
 			{
 				offset += snprintf(&(readout[offset]), max_size-offset, "%s %d\n", ReadoutRegs[i].reg_name, temp_val);
 			}
@@ -441,8 +346,7 @@ ADXL_status_t ADXL_ReadData(int16_t *Xdata, int16_t *Ydata, int16_t *Zdata)
 	{
 		uint8_t all_regs[6];
 		// read multiple registers from DATAX0 to DATAZ1 (6 regs starting from addr 0x32)
-		HAL_StatusTypeDef state = HAL_I2C_Mem_Read(&hi2c1, ADEXL_ID, DATAX0_REG, 1, all_regs, 6, 1000);
-		if( HAL_OK == state)
+		if(ADXL_ERR_NO_ERROR == ADXL_ReadMultipleRegsBlocking(DATAX0_REG, all_regs, 6))
 		{
 			*Xdata = (int16_t)(all_regs[1]<<8)|(all_regs[0]);
 			*Ydata = (int16_t)(all_regs[3]<<8)|(all_regs[2]);

@@ -13,7 +13,7 @@ Z_OFFSET = -36.79
 
 WATERMARK_SIZE = 16
 ONE_SAMPLE_SIZE = 6
-SAMPLES_NUM = 20
+SAMPLES_NUM = 200
 
 with serial.Serial("COM5", 115200, timeout= 2) as ser:
 

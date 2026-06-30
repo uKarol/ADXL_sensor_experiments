@@ -59,7 +59,7 @@ void ADXL_INT1InterruptHandler(void);
 void ADXL_FIFO_Check();
 ADXL_status_t ADXL_RegInitAlternative();
 ADXL_StreamStatus ADXL_GetStreamStatus(void);
-
+void ADXL_I2CTxComplete(void);
 uint8_t* ADXL_GetStreamedData(void);
 void ADXL_ReleaseDataBuffer(void);
 void ADXL_DMAStreamComplete(void);

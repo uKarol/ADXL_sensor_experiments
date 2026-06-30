@@ -21,12 +21,14 @@
 #include "dma.h"
 #include "i2c.h"
 #include "usart.h"
+#include "tim.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stdio.h"
 #include "ADXL_driver.h"
+#include "ADXL_i2c_conn.h"
 #include "MeasurementFSM.h"
 /* USER CODE END Includes */
 
@@ -70,11 +72,19 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   }
 }
 
+void HAL_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+	if(hi2c == &hi2c1)
+	{
+		ADXL_I2CTxComplete();
+	}
+}
+
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
 	if(hi2c == &hi2c1)
 	{
-		ADXL_DMAStreamComplete();
+		ADXL_I2CRxComplete();
 	}
 }
 /* USER CODE END 0 */
@@ -111,6 +121,7 @@ int main(void)
   MX_DMA_Init();
   MX_LPUART1_UART_Init();
   MX_I2C1_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
