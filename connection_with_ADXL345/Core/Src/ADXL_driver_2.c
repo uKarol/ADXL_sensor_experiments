@@ -213,16 +213,8 @@ ADXL_status_t ADXL_StopStreamMeasurements(void)
 	ADXL_status_t ret_val = ADXL_FAILURE;
 	if(CurrentState.DriverState == DRIVER_READY)
 	{
-		ADXL_Errors_t reg_status = ADXL_WriteRegBlocking(POWER_CTL, 0x0);
-		if(reg_status == ADXL_ERR_NO_ERROR)
-		{
-			CurrentState.DriverState = DRIVER_HALTED;
-			ret_val = ADXL_SUCCESS;
-		}
-		else
-		{
-			ADXL_SetError(reg_status);
-		}
+		ADXL_SetEvent(ADXL_EVT_STOP_REQUEST);
+		CurrentState.DriverState = DRIVER_HALTED;
 	}
 	return ret_val;
 }

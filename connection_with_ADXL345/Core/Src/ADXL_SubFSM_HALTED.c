@@ -44,7 +44,7 @@ ADXL_Errors_t ADXL_FSMHalted_GetError()
 	return StreamHaltedFsmData.last_error;
 }
 
-volatile uint8_t data_in;
+static volatile uint8_t data_in;
 
 static FSM_ret StreamHalted_IdleStateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 {
