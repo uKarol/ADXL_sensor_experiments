@@ -32,7 +32,7 @@ void Stream_StoppingSubFsmInit(fsm_set_event_callback event_cb)
 {
 	StreamStoppingFsmData.last_error = ADXL_ERR_NO_ERROR;
 	StreamStoppingFsmData.evt_callback = event_cb;
-	Fsm_Init(&StreamStoppingFsmContext, StreamStopping_EntryStateHandler , &StreamStoppingFsmData);
+	Fsm_Init(&StreamStoppingFsmContext, StreamStopping_EntryStateHandler , &StreamStoppingFsmData, NULL);
 }
 
 FSM_ret ADXL_FSMStopping_ProcessEvent(FsmEvent_t *user_event)
@@ -55,31 +55,23 @@ static FSM_ret StreamStopping_EntryStateHandler(fsm_context *ctx, FsmEvent_t *us
 
 	switch (current_event)
 	{
+		case FSM_INITIAL_EVENT:
+			break;
 		case ADXL_EVT_STOP_STREAM:
-
-			if(ADXLConn_GetCurrentOperation()!= ADXL_OP_NO_OPERATION)
+			context_data->last_error = ADXL_ERR_NO_ERROR;
+			if(ADXLConn_GetCurrentOperation()== ADXL_OP_NO_OPERATION)
 			{
-				ctx->current_state = StreamStopping_WaitingStateHandler;
+				Fsm_StateTransition(ctx, StreamStopping_ResettingPowerCTL);
 			}
 			else
 			{
-				data_in = 0;
-				if(ADXL_WriteRegNonBlocking(POWER_CTL, &data_in) == ADXL_ERR_NO_ERROR)
-				{
-					ctx->current_state = StreamStopping_ResettingPowerCTL;
-				}
-				else
-				{
-					ret_val = FSM_ERROR;
-					context_data->last_error = ADXL_ERR_COMMUNICATION_LOST;
-					ctx->current_state = StreamStopping_EntryStateHandler;
-				}
-				break;
+				Fsm_StateTransition(ctx, StreamStopping_WaitingStateHandler);
 			}
+			break;
 		default:
 			ret_val = FSM_ERROR;
 			context_data->last_error = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
-			ctx->current_state = StreamStopping_EntryStateHandler;
+			Fsm_StateTransition(ctx,StreamStopping_EntryStateHandler);
 			break;
 	}
 
@@ -94,24 +86,16 @@ static FSM_ret StreamStopping_WaitingStateHandler(fsm_context *ctx, FsmEvent_t *
 
 	switch (current_event)
 	{
+		case FSM_INITIAL_EVENT:
+			break;
 		case ADXL_EVT_I2C_TX_COMPLETED: // fallthrough
 		case ADXL_EVT_I2C_RX_COMPLETED:
-			data_in = 0;
-			if(ADXL_WriteRegNonBlocking(POWER_CTL, &data_in) == ADXL_ERR_NO_ERROR)
-			{
-				ctx->current_state = StreamStopping_ResettingPowerCTL;
-			}
-			else
-			{
-				ret_val = FSM_ERROR;
-				context_data->last_error = ADXL_ERR_COMMUNICATION_LOST;
-				ctx->current_state = StreamStopping_EntryStateHandler;
-			}
+				Fsm_StateTransition(ctx, StreamStopping_ResettingPowerCTL);
 			break;
 		default:
 			ret_val = FSM_ERROR;
 			context_data->last_error = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
-			ctx->current_state = StreamStopping_EntryStateHandler;
+			Fsm_StateTransition(ctx,StreamStopping_EntryStateHandler);
 			break;
 	}
 	return ret_val;
@@ -125,14 +109,23 @@ static FSM_ret StreamStopping_ResettingPowerCTL(fsm_context *ctx, FsmEvent_t *us
 
 	switch (current_event)
 	{
+		case FSM_INITIAL_EVENT:
+			data_in = 0;
+			if(ADXL_WriteRegNonBlocking(POWER_CTL, &data_in) != ADXL_ERR_NO_ERROR)
+			{
+				ret_val = FSM_ERROR;
+				context_data->last_error = ADXL_ERR_COMMUNICATION_LOST;
+				Fsm_StateTransition(ctx, StreamStopping_EntryStateHandler);
+			}
+			break;
 		case ADXL_EVT_I2C_TX_COMPLETED:
-			ctx->current_state = StreamStopping_EntryStateHandler;
 			context_data->evt_callback(ADXL_EVT_STREAM_HALTED);
+			Fsm_StateTransition(ctx, StreamStopping_EntryStateHandler);
 			break;
 		default:
 			ret_val = FSM_ERROR;
 			context_data->last_error = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
-			ctx->current_state = StreamStopping_EntryStateHandler;
+			Fsm_StateTransition(ctx, StreamStopping_EntryStateHandler);
 			break;
 	}
 	return ret_val;

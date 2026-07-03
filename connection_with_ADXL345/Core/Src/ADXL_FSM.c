@@ -64,7 +64,7 @@ void ADXL_FSM_Init(uint8_t fifo_samples, fsm_error_callback error_cb, fsm_set_ev
 	Stream_FlushingSubFsmInit(event_cb);
 	Stream_HaltedSubFsmInit(event_cb);
 	Stream_StoppingSubFsmInit(event_cb);
-	Fsm_Init(&StreamFsmContext, StreamHalted_StateHandler , &StreamFsmData);
+	Fsm_Init(&StreamFsmContext, StreamHalted_StateHandler , &StreamFsmData, NULL);
 	EvtTimerInit(ADXL_TimeoutEvent);
 }
 
@@ -77,16 +77,17 @@ static FSM_ret StreamStopping_StateHandler (fsm_context *ctx, FsmEvent_t *user_e
 
 	switch(current_event)
 	{
+		case FSM_INITIAL_EVENT:
+			user_event->user_event = ADXL_EVT_STOP_STREAM; // fallthrough
 		case ADXL_EVT_STOP_STREAM: // fallthrough
 		case ADXL_EVT_I2C_TX_COMPLETED: // fallthrough
 		case ADXL_EVT_I2C_RX_COMPLETED:
 
 			if(ADXL_FSMStopping_ProcessEvent(user_event) != FSM_OK )
 			{
-				ctx->current_state = StreamError_StateHandler;
 				context_data->stream_errors = ADXL_FSMStopping_GetError();
 				context_data->current_state = STREAM_ERROR;
-				context_data->evt_callback(ADXL_EVT_ERROR_OCCURED);
+				Fsm_StateTransition(ctx, StreamError_StateHandler);
 			}
 			else
 			{
@@ -94,14 +95,13 @@ static FSM_ret StreamStopping_StateHandler (fsm_context *ctx, FsmEvent_t *user_e
 			}
 			break;
 		case ADXL_EVT_STREAM_HALTED:
-			ctx->current_state = StreamHalted_StateHandler;
+			Fsm_StateTransition(ctx, StreamHalted_StateHandler);
 
 			break;
 		default:
-			ctx->current_state = StreamError_StateHandler;
 			context_data->stream_errors = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
 			context_data->current_state = STREAM_ERROR;
-			context_data->evt_callback(ADXL_EVT_ERROR_OCCURED);
+			Fsm_StateTransition(ctx, StreamError_StateHandler);
 			break;
 
 	}
@@ -117,17 +117,17 @@ static FSM_ret StreamHalted_StateHandler (fsm_context *ctx, FsmEvent_t *user_eve
 
 	switch(current_event)
 	{
+		case FSM_INITIAL_EVENT:
+			break;
 		case ADXL_EVT_START_STREAM: // fallthrough
 		case ADXL_EVT_I2C_TX_COMPLETED: // fallthrough
 		case ADXL_EVT_I2C_RX_COMPLETED: // fallthrough
 		case ADXL_EVT_TIMEOUT:
-
 			if(ADXL_FSMHalted_ProcessEvent(user_event) != FSM_OK )
 			{
-				ctx->current_state = StreamError_StateHandler;
 				context_data->stream_errors = ADXL_FSMHalted_GetError();
 				context_data->current_state = STREAM_ERROR;
-				context_data->evt_callback(ADXL_EVT_ERROR_OCCURED);
+				Fsm_StateTransition(ctx, StreamError_StateHandler);
 			}
 			else
 			{
@@ -135,15 +135,13 @@ static FSM_ret StreamHalted_StateHandler (fsm_context *ctx, FsmEvent_t *user_eve
 			}
 			break;
 		case ADXL_EVT_SENSOR_ENABLED:
-			ctx->current_state = StreamFlushing_StateHandler;
-			context_data->evt_callback(ADXL_EVT_FIFO_FLUSH_REQ);
+			Fsm_StateTransition(ctx, StreamFlushing_StateHandler);
 
 			break;
 		default:
-			ctx->current_state = StreamError_StateHandler;
 			context_data->stream_errors = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
 			context_data->current_state = STREAM_ERROR;
-			context_data->evt_callback(ADXL_EVT_ERROR_OCCURED);
+			Fsm_StateTransition(ctx, StreamError_StateHandler);
 			break;
 
 	}
@@ -159,14 +157,15 @@ static FSM_ret StreamFlushing_StateHandler (fsm_context *ctx, FsmEvent_t *user_e
 
 	switch(current_event)
 	{
+		case FSM_INITIAL_EVENT:
+			user_event->user_event = ADXL_EVT_FIFO_FLUSH_REQ; // fallthough
 		case ADXL_EVT_FIFO_FLUSH_REQ: // fallthrough
 		case ADXL_EVT_I2C_RX_COMPLETED:
 			if(ADXL_FSMFlushing_ProcessEvent(user_event) != FSM_OK )
 			{
-				ctx->current_state = StreamError_StateHandler;
 				context_data->stream_errors = ADXL_FSMFlushing_GetError();
 				context_data->current_state = STREAM_ERROR;
-				context_data->evt_callback(ADXL_EVT_ERROR_OCCURED);
+				Fsm_StateTransition(ctx, StreamError_StateHandler);
 			}
 			else
 			{
@@ -174,18 +173,16 @@ static FSM_ret StreamFlushing_StateHandler (fsm_context *ctx, FsmEvent_t *user_e
 			}
 			break;
 		case ADXL_EVT_FIFO_CLEARED:
-			ctx->current_state = StreamWaiting_StateHandler;
+			Fsm_StateTransition(ctx,StreamWaiting_StateHandler);
 
 			break;
 		case ADXL_EVT_STOP_REQUEST:
-			ctx->current_state = StreamStopping_StateHandler;
-			context_data->evt_callback(ADXL_EVT_STOP_STREAM);
+			Fsm_StateTransition(ctx,StreamStopping_StateHandler);
 			break;
 		default:
-			ctx->current_state = StreamError_StateHandler;
 			context_data->stream_errors = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
 			context_data->current_state = STREAM_ERROR;
-			context_data->evt_callback(ADXL_EVT_ERROR_OCCURED);
+			Fsm_StateTransition(ctx, StreamError_StateHandler);
 			break;
 
 	}
@@ -201,14 +198,15 @@ FSM_ret StreamWaiting_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 
 	switch(current_event)
 	{
+		case FSM_INITIAL_EVENT:
+			break;
 		case ADXL_EVT_EXTI_IRQ: // fallthrough
 		case ADXL_EVT_I2C_RX_COMPLETED:
 			if(ADXL_FSMWaiting_ProcessEvent(user_event) != FSM_OK )
 			{
-				ctx->current_state = StreamError_StateHandler;
 				context_data->stream_errors = ADXL_FSMWaiting_GetError();
 				context_data->current_state = STREAM_ERROR;
-				context_data->evt_callback(ADXL_EVT_ERROR_OCCURED);
+				Fsm_StateTransition(ctx, StreamError_StateHandler);
 			}
 			else
 			{
@@ -219,27 +217,24 @@ FSM_ret StreamWaiting_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 
 			if( ADXL_ReadMultipleRegsNonBlocking(DATAX0_REG, ADXL_raw_data, ONE_SAMPLE_SIZE) == ADXL_ERR_NO_ERROR)
 			{
-				ctx->current_state = StreamInProgress_StateHandler;
 				context_data->current_state = STREAM_IN_PROGRESS;
 				ret_val = FSM_OK;
+				Fsm_StateTransition(ctx, StreamInProgress_StateHandler);
 			}
 			else
 			{
-				ctx->current_state = StreamError_StateHandler;
 				context_data->stream_errors = ADXL_ERR_COMMUNICATION_LOST;
 				context_data->current_state = STREAM_ERROR;
-				context_data->evt_callback(ADXL_EVT_ERROR_OCCURED);
+				Fsm_StateTransition(ctx, StreamError_StateHandler);
 			}
 			break;
 		case ADXL_EVT_STOP_REQUEST:
-			ctx->current_state = StreamStopping_StateHandler;
-			context_data->evt_callback(ADXL_EVT_STOP_STREAM);
+			Fsm_StateTransition(ctx,StreamStopping_StateHandler);
 			break;
 		default:
-			ctx->current_state = StreamError_StateHandler;
 			context_data->stream_errors = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
 			context_data->current_state = STREAM_ERROR;
-			context_data->evt_callback(ADXL_EVT_ERROR_OCCURED);
+			Fsm_StateTransition(ctx, StreamError_StateHandler);
 			break;
 
 	}
@@ -254,13 +249,15 @@ FSM_ret StreamInProgress_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 	StreamCtxData_t *context_data = (StreamCtxData_t*)ctx->user_data;
 	switch(current_event)
 	{
+		case FSM_INITIAL_EVENT:
+			break;
 		case ADXL_EVT_I2C_RX_COMPLETED:
 
 			if(context_data->readout_num == (context_data->fifo_samples_num-1))
 			{
 				context_data->readout_num = 0;
 				context_data->current_state = STREAM_COMPLETED;
-				ctx->current_state = StreamCompleted_StateHandler;
+				Fsm_StateTransition(ctx, StreamCompleted_StateHandler);
 
 			}
 			else
@@ -271,22 +268,19 @@ FSM_ret StreamInProgress_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 				{
 					ret_val = FSM_ERROR;
 					context_data->current_state = STREAM_ERROR;
-					ctx->current_state = StreamError_StateHandler;
 					context_data->stream_errors = ADXL_ERR_DMA_PROBLEM;
-					context_data->evt_callback(ADXL_EVT_ERROR_OCCURED);
+					Fsm_StateTransition(ctx, StreamError_StateHandler);
 				}
 			}
 			break;
 		case ADXL_EVT_STOP_REQUEST:
-			ctx->current_state = StreamStopping_StateHandler;
-			context_data->evt_callback(ADXL_EVT_STOP_STREAM);
+			Fsm_StateTransition(ctx, StreamStopping_StateHandler);
 			break;
 		default:
 			ret_val = FSM_ERROR;
 			context_data->current_state = STREAM_ERROR;
-			ctx->current_state = StreamError_StateHandler;
 			context_data->stream_errors = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
-			context_data->evt_callback(ADXL_EVT_ERROR_OCCURED);
+			Fsm_StateTransition(ctx, StreamError_StateHandler);
 			break;
 
 	}
@@ -300,19 +294,20 @@ FSM_ret StreamCompleted_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 	StreamCtxData_t *context_data = (StreamCtxData_t*)ctx->user_data;
 	switch(current_event)
 	{
+		case FSM_INITIAL_EVENT:
+			break;
 		case ADXL_EVT_STREAM_FINISHED:
 			break;
 		case ADXL_EVT_BUFFER_RELEASE_REQ:
-			ctx->current_state = StreamWaiting_StateHandler;
 			context_data->current_state = STREAM_IDLE;
+			Fsm_StateTransition(ctx, StreamWaiting_StateHandler);
 			break;
 
 		default:
 			ret_val = FSM_ERROR;
-			ctx->current_state = StreamError_StateHandler;
 			context_data->current_state = STREAM_ERROR;
 			context_data->stream_errors = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
-			context_data->evt_callback(ADXL_EVT_ERROR_OCCURED);
+			Fsm_StateTransition(ctx, StreamError_StateHandler);
 			break;
 
 	}
@@ -326,7 +321,7 @@ FSM_ret StreamError_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 	StreamCtxData_t *context_data = (StreamCtxData_t*)ctx->user_data;
 	switch(current_event)
 	{
-		case ADXL_EVT_ERROR_OCCURED:
+		case FSM_INITIAL_EVENT:
 			ret_val = FSM_ERROR;
 			context_data->error_callback(context_data->stream_errors);
 			break;
@@ -335,7 +330,7 @@ FSM_ret StreamError_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 			context_data->current_state = STREAM_IDLE;
 			context_data->readout_num = 0;
 			context_data->stream_errors = ADXL_ERR_NO_ERROR;
-			ctx->current_state = StreamWaiting_StateHandler;
+			Fsm_StateTransition(ctx, StreamStopping_StateHandler);
 			break;
 
 		default:

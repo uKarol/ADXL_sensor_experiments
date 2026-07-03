@@ -31,7 +31,7 @@ static FSM_ret StreamHalted_Waiting (fsm_context *ctx, FsmEvent_t *user_event);
 void Stream_HaltedSubFsmInit(fsm_set_event_callback event_cb)
 {
 	StreamHaltedFsmData.evt_callback = event_cb;
-	Fsm_Init(&StreamHaltedFsmContext, StreamHalted_IdleStateHandler , &StreamHaltedFsmData);
+	Fsm_Init(&StreamHaltedFsmContext, StreamHalted_IdleStateHandler , &StreamHaltedFsmData, NULL);
 }
 
 FSM_ret ADXL_FSMHalted_ProcessEvent(FsmEvent_t *user_event)
@@ -54,11 +54,13 @@ static FSM_ret StreamHalted_IdleStateHandler (fsm_context *ctx, FsmEvent_t *user
 
 	switch (current_event)
 	{
+		case FSM_INITIAL_EVENT:
+			break;
 		case ADXL_EVT_START_STREAM:
 			data_in = POWER_CTL_MEASURE;
 			if(ADXL_WriteRegNonBlocking(POWER_CTL, &data_in) == ADXL_ERR_NO_ERROR)
 			{
-				ctx->current_state = StreamHalted_SettingPowerCTL;
+				Fsm_StateTransition(ctx, StreamHalted_SettingPowerCTL);
 			}
 			else
 			{
@@ -81,14 +83,15 @@ static FSM_ret StreamHalted_SettingPowerCTL (fsm_context *ctx, FsmEvent_t *user_
 
 	switch (current_event)
 	{
+		case FSM_INITIAL_EVENT:
+			break;
 		case ADXL_EVT_I2C_TX_COMPLETED:
-
 
 			if(ADXL_ReadRegNonBlocking(POWER_CTL, &helper_data)!= ADXL_ERR_NO_ERROR)
 			{
 				ret_val = FSM_ERROR;
 				context_data->last_error = ADXL_ERR_COMMUNICATION_LOST;
-				ctx->current_state = StreamHalted_IdleStateHandler;
+				Fsm_StateTransition(ctx, StreamHalted_IdleStateHandler);
 			}
 
 			break;
@@ -96,7 +99,7 @@ static FSM_ret StreamHalted_SettingPowerCTL (fsm_context *ctx, FsmEvent_t *user_
 			if(helper_data == POWER_CTL_MEASURE)
 			{
 				EvtTimerStart(100);
-				ctx->current_state = StreamHalted_Waiting;
+				Fsm_StateTransition(ctx, StreamHalted_Waiting);
 				break;
 			}
 			else
@@ -107,7 +110,7 @@ static FSM_ret StreamHalted_SettingPowerCTL (fsm_context *ctx, FsmEvent_t *user_
 		default:
 			ret_val = FSM_ERROR;
 			context_data->last_error = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
-			ctx->current_state = StreamHalted_IdleStateHandler;
+			Fsm_StateTransition(ctx, StreamHalted_IdleStateHandler);
 			break;
 	}
 
@@ -122,14 +125,16 @@ static FSM_ret StreamHalted_Waiting (fsm_context *ctx, FsmEvent_t *user_event)
 
 	switch (current_event)
 	{
+		case FSM_INITIAL_EVENT:
+			break;
 		case ADXL_EVT_TIMEOUT:
-			ctx->current_state = StreamHalted_IdleStateHandler;
 			context_data->evt_callback(ADXL_EVT_SENSOR_ENABLED);
+			Fsm_StateTransition(ctx, StreamHalted_IdleStateHandler);
 			break;
 		default:
 			ret_val = FSM_ERROR;
 			context_data->last_error = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
-			ctx->current_state = StreamHalted_IdleStateHandler;
+			Fsm_StateTransition(ctx, StreamHalted_IdleStateHandler);
 		break;
 	}
 

@@ -42,7 +42,7 @@ FSM_ret ADXL_FSMFlushing_ProcessEvent(FsmEvent_t *user_event)
 void Stream_FlushingSubFsmInit(fsm_set_event_callback event_cb)
 {
 	StreamFlushingFsmData.evt_callback = event_cb;
-	Fsm_Init(&StreamFlushingFsmContext, StreamFlushingIdle_StateHandler , &StreamFlushingFsmData);
+	Fsm_Init(&StreamFlushingFsmContext, StreamFlushingIdle_StateHandler , &StreamFlushingFsmData, NULL);
 }
 
 static FSM_ret StreamFlushingIdle_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
@@ -53,13 +53,15 @@ static FSM_ret StreamFlushingIdle_StateHandler (fsm_context *ctx, FsmEvent_t *us
 
 	switch(current_event)
 	{
+		case FSM_INITIAL_EVENT:
+			break;
 		case ADXL_EVT_FIFO_FLUSH_REQ:
 			if(ADXL_ReadRegNonBlocking(FIFO_STATUS, &(context_data->dma_out_data)) == ADXL_ERR_NO_ERROR )
 			{
 				context_data->last_error = ADXL_ERR_NO_ERROR;
 				context_data->expected_size = 0;
 				context_data->readout_num = 0;
-				ctx->current_state = StreamFlushingCheckFifo_StateHandler;
+				Fsm_StateTransition(ctx, StreamFlushingCheckFifo_StateHandler);
 			}
 			else
 			{
@@ -84,23 +86,25 @@ static FSM_ret StreamFlushingCheckFifo_StateHandler (fsm_context *ctx, FsmEvent_
 
 	switch(current_event)
 	{
+		case FSM_INITIAL_EVENT:
+			break;
 		case ADXL_EVT_I2C_RX_COMPLETED:
 			context_data->expected_size = (context_data->dma_out_data & FIFO_ENTRIES_BIT_MSK);
 			if( ADXL_ReadMultipleRegsNonBlocking(DATAX0_REG, dma_readout, ONE_SAMPLE_SIZE) == ADXL_ERR_NO_ERROR)
 			{
-				ctx->current_state = StreamFlushingDataReadout_StateHandler;
+				Fsm_StateTransition(ctx, StreamFlushingDataReadout_StateHandler);
 			}
 			else
 			{
 				ret_val = FSM_ERROR;
 				context_data->last_error = ADXL_ERR_DMA_PROBLEM;
-				ctx->current_state = StreamFlushingIdle_StateHandler;
+				Fsm_StateTransition(ctx, StreamFlushingIdle_StateHandler);
 			}
 			break;
 		default:
 			ret_val = FSM_ERROR;
 			context_data->last_error = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
-			ctx->current_state = StreamFlushingIdle_StateHandler;
+			Fsm_StateTransition(ctx, StreamFlushingIdle_StateHandler);
 	}
 	return ret_val;
 }
@@ -112,13 +116,15 @@ static FSM_ret StreamFlushingDataReadout_StateHandler (fsm_context *ctx, FsmEven
 
 	switch(current_event)
 	{
+		case FSM_INITIAL_EVENT:
+			break;
 		case ADXL_EVT_I2C_RX_COMPLETED:
 			context_data->readout_num ++;
 
 			if(context_data->readout_num == context_data->expected_size)
 			{
-				ctx->current_state = StreamFlushingIdle_StateHandler;
 				context_data->evt_callback(ADXL_EVT_FIFO_CLEARED);
+				Fsm_StateTransition(ctx, StreamFlushingIdle_StateHandler);
 			}
 			else
 			{
@@ -126,7 +132,7 @@ static FSM_ret StreamFlushingDataReadout_StateHandler (fsm_context *ctx, FsmEven
 				{
 					ret_val = FSM_ERROR;
 					context_data->last_error = ADXL_ERR_DMA_PROBLEM;
-					ctx->current_state = StreamFlushingIdle_StateHandler;
+					Fsm_StateTransition(ctx, StreamFlushingIdle_StateHandler);
 				}
 			}
 			break;
@@ -134,7 +140,7 @@ static FSM_ret StreamFlushingDataReadout_StateHandler (fsm_context *ctx, FsmEven
 		default:
 			ret_val = FSM_ERROR;
 			context_data->last_error = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
-			ctx->current_state = StreamFlushingIdle_StateHandler;
+			Fsm_StateTransition(ctx, StreamFlushingIdle_StateHandler);
 	}
 
 	return ret_val;

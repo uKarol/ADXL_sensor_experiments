@@ -40,7 +40,7 @@ void Stream_WaitingSubFsmInit(fsm_set_event_callback event_cb, uint8_t fifo_samp
 {
 	StreamWaitingFsmData.expected_size = fifo_samples;
 	StreamWaitingFsmData.evt_callback = event_cb;
-	Fsm_Init(&StreamWaitingFsmContext, StreamWaiting_IdleStateHandler , &StreamWaitingFsmData);
+	Fsm_Init(&StreamWaitingFsmContext, StreamWaiting_IdleStateHandler , &StreamWaitingFsmData, NULL);
 }
 
 static FSM_ret StreamWaiting_IdleStateHandler(fsm_context *ctx, FsmEvent_t *user_event)
@@ -51,20 +51,22 @@ static FSM_ret StreamWaiting_IdleStateHandler(fsm_context *ctx, FsmEvent_t *user
 
 	switch (current_event)
 	{
-	case ADXL_EVT_EXTI_IRQ:
-		/* code */
-		if(ADXL_ReadRegNonBlocking(INT_SOURCE, &(context_data->dma_out_data)) == ADXL_ERR_NO_ERROR )
-		{
-			ctx->current_state = StreamWaiting_CheckIntStatusStateHandler;
-		}
-		else
-		{
-			ret_val = FSM_ERROR;
-			context_data->last_error = ADXL_ERR_DMA_PROBLEM;
-		}
-		break;
-	default:
-		break;
+		case FSM_INITIAL_EVENT:
+			break;
+		case ADXL_EVT_EXTI_IRQ:
+			/* code */
+			if(ADXL_ReadRegNonBlocking(INT_SOURCE, &(context_data->dma_out_data)) == ADXL_ERR_NO_ERROR )
+			{
+				Fsm_StateTransition(ctx, StreamWaiting_CheckIntStatusStateHandler);
+			}
+			else
+			{
+				ret_val = FSM_ERROR;
+				context_data->last_error = ADXL_ERR_DMA_PROBLEM;
+			}
+			break;
+		default:
+			break;
 	}
 
 	return ret_val;
@@ -79,32 +81,35 @@ static FSM_ret StreamWaiting_CheckIntStatusStateHandler (fsm_context *ctx, FsmEv
 
 	switch (current_event)
 	{
+		case FSM_INITIAL_EVENT:
+			break;
 		case ADXL_EVT_I2C_RX_COMPLETED:
 			/* code */
 			if(context_data->dma_out_data & ADXL_INT_ENABLE_OVERRUN)
 			{
 				context_data->evt_callback(ADXL_EVT_FIFO_OVERRUN);
-				ctx->current_state = StreamWaiting_IdleStateHandler;
 				context_data->last_error = ADXL_ERR_OVERRUN;
+				Fsm_StateTransition(ctx, StreamWaiting_IdleStateHandler);
+
 			}
 			else if(context_data->dma_out_data & ADXL_INT_ENABLE_WATERMARK)
 			{
 				if( ADXL_ReadRegNonBlocking(FIFO_STATUS, &(context_data->dma_out_data)) == ADXL_ERR_NO_ERROR )
 				{
-					ctx->current_state = StreamWaiting_CheckFifoStateHandler;
+					Fsm_StateTransition(ctx, StreamWaiting_CheckFifoStateHandler);
 				}
 				else
 				{
 					ret_val = FSM_ERROR;
 					context_data->last_error = ADXL_ERR_DMA_PROBLEM;
-					ctx->current_state = StreamWaiting_IdleStateHandler;
+					Fsm_StateTransition(ctx, StreamWaiting_IdleStateHandler);
 				}
 			}
 			break;
 		default:
 				ret_val = FSM_ERROR;
 				context_data->last_error = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
-				ctx->current_state = StreamWaiting_IdleStateHandler;
+				Fsm_StateTransition(ctx, StreamWaiting_IdleStateHandler);
 			break;
 	}
 
@@ -120,18 +125,20 @@ static FSM_ret StreamWaiting_CheckFifoStateHandler (fsm_context *ctx, FsmEvent_t
 
 	switch (current_event)
 	{
+		case FSM_INITIAL_EVENT:
+			break;
 		case ADXL_EVT_I2C_RX_COMPLETED:
 			/* code */
 			if((context_data->dma_out_data & FIFO_ENTRIES_BIT_MSK) >= context_data->expected_size)
 			{
 				context_data->evt_callback(ADXL_EVT_FIFO_READY);
-				ctx->current_state = StreamWaiting_IdleStateHandler;
+				Fsm_StateTransition(ctx, StreamWaiting_IdleStateHandler);
 			}
 			break;
 		default:
 			ret_val = FSM_ERROR;
 			context_data->last_error = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
-			ctx->current_state = StreamWaiting_IdleStateHandler;
+			Fsm_StateTransition(ctx, StreamWaiting_IdleStateHandler);
 			break;
 	}
 
