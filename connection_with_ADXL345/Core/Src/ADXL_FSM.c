@@ -47,6 +47,20 @@ typedef struct
 static StreamCtxData_t StreamFsmData;
 static fsm_context StreamFsmContext;
 
+void ADXL_StreamReset()
+{
+	Stream_WaitingReset();
+	Stream_FlushingReset();
+	Stream_StoppingReset();
+	Stream_HaltedReset();
+
+	StreamFsmData.current_state = STREAM_IDLE;
+	StreamFsmData.readout_num = 0;
+	StreamFsmData.stream_errors = ADXL_ERR_NO_ERROR;
+	Fsm_StateTransition(&StreamFsmContext, StreamStopping_StateHandler);
+
+}
+
 static void ADXL_FSM_ErrorCallback()
 {
 	StreamFsmData.current_state = STREAM_ERROR;
@@ -315,11 +329,8 @@ FSM_ret StreamError_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 			context_data->error_callback(context_data->stream_errors);
 			break;
 		case ADXL_EVT_RESET_ERROR_REQUEST:
+			ADXL_StreamReset();
 			ret_val = FSM_OK;
-			context_data->current_state = STREAM_IDLE;
-			context_data->readout_num = 0;
-			context_data->stream_errors = ADXL_ERR_NO_ERROR;
-			Fsm_StateTransition(ctx, StreamStopping_StateHandler);
 			break;
 
 		default:

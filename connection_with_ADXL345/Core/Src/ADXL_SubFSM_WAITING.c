@@ -26,6 +26,12 @@ static FSM_ret StreamWaiting_IdleStateHandler (fsm_context *ctx, FsmEvent_t *use
 static FSM_ret StreamWaiting_CheckIntStatusStateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 static FSM_ret StreamWaiting_CheckFifoStateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 
+void Stream_WaitingReset()
+{
+	StreamWaitingFsmData.last_error = ADXL_ERR_NO_ERROR;
+	Fsm_StateTransition(&StreamWaitingFsmContext, StreamWaiting_IdleStateHandler);
+}
+
 static void FSM_WaitingErrorCallback(void)
 {
 	Fsm_StateTransition(&StreamWaitingFsmContext, StreamWaiting_IdleStateHandler);

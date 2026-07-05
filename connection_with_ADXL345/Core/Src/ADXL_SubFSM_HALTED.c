@@ -27,6 +27,11 @@ static FSM_ret StreamHalted_IdleStateHandler (fsm_context *ctx, FsmEvent_t *user
 static FSM_ret StreamHalted_SettingPowerCTL (fsm_context *ctx, FsmEvent_t *user_event);
 static FSM_ret StreamHalted_Waiting (fsm_context *ctx, FsmEvent_t *user_event);
 
+void Stream_HaltedReset()
+{
+	StreamHaltedFsmData.last_error = ADXL_ERR_NO_ERROR;
+	Fsm_StateTransition(&StreamHaltedFsmContext, StreamHalted_IdleStateHandler);
+}
 
 static void FlushingSubFsmErrorCallback()
 {

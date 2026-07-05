@@ -27,6 +27,11 @@ static FSM_ret StreamStopping_EntryStateHandler (fsm_context *ctx, FsmEvent_t *u
 static FSM_ret StreamStopping_ResettingPowerCTL (fsm_context *ctx, FsmEvent_t *user_event);
 static FSM_ret StreamStopping_WaitingStateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 
+void Stream_StoppingReset()
+{
+	StreamStoppingFsmData.last_error = ADXL_ERR_NO_ERROR;
+	Fsm_StateTransition(&StreamStoppingFsmContext, StreamStopping_EntryStateHandler);
+}
 
 void FSM_StoppingErrorCallback(void)
 {

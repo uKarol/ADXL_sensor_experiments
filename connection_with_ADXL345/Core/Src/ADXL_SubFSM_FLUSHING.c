@@ -28,6 +28,13 @@ static FSM_ret StreamFlushingIdle_StateHandler (fsm_context *ctx, FsmEvent_t *us
 static FSM_ret StreamFlushingCheckFifo_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 static FSM_ret StreamFlushingDataReadout_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 
+void Stream_FlushingReset()
+{
+	StreamFlushingFsmData.last_error = ADXL_ERR_NO_ERROR;
+	StreamFlushingFsmData.readout_num = 0;
+	StreamFlushingFsmData.expected_size = 0;
+	Fsm_StateTransition(&StreamFlushingFsmContext, StreamFlushingIdle_StateHandler);
+}
 
 static void FlushingSubFsmErrorCallback()
 {

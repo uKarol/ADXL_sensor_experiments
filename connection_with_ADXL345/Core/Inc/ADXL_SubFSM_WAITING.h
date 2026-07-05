@@ -16,5 +16,6 @@
 void Stream_WaitingSubFsmInit(fsm_set_event_callback event_cb, uint8_t fifo_samples);
 FSM_ret ADXL_FSMWaiting_ProcessEvent(FsmEvent_t *user_event);
 ADXL_Errors_t ADXL_FSMWaiting_GetError();
+void Stream_WaitingReset();
 
 #endif /* INC_ADXL_SUBFSM_WAITING_H_ */

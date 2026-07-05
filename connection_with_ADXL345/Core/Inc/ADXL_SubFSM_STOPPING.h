@@ -13,6 +13,7 @@
 #include "ADXL_defs.h"
 #include "ADXL_driver.h"
 
+void Stream_StoppingReset();
 void Stream_StoppingSubFsmInit(fsm_set_event_callback event_cb);
 FSM_ret ADXL_FSMStopping_ProcessEvent(FsmEvent_t *user_event);
 ADXL_Errors_t ADXL_FSMStopping_GetError();
