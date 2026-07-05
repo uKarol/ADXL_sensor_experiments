@@ -28,11 +28,16 @@ static FSM_ret StreamStopping_ResettingPowerCTL (fsm_context *ctx, FsmEvent_t *u
 static FSM_ret StreamStopping_WaitingStateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 
 
+void FSM_StoppingErrorCallback(void)
+{
+	Fsm_StateTransition(&StreamStoppingFsmContext, StreamStopping_EntryStateHandler);
+}
+
 void Stream_StoppingSubFsmInit(fsm_set_event_callback event_cb)
 {
 	StreamStoppingFsmData.last_error = ADXL_ERR_NO_ERROR;
 	StreamStoppingFsmData.evt_callback = event_cb;
-	Fsm_Init(&StreamStoppingFsmContext, StreamStopping_EntryStateHandler , &StreamStoppingFsmData, NULL);
+	Fsm_Init(&StreamStoppingFsmContext, StreamStopping_EntryStateHandler , &StreamStoppingFsmData, FSM_StoppingErrorCallback);
 }
 
 FSM_ret ADXL_FSMStopping_ProcessEvent(FsmEvent_t *user_event)
@@ -71,7 +76,6 @@ static FSM_ret StreamStopping_EntryStateHandler(fsm_context *ctx, FsmEvent_t *us
 		default:
 			ret_val = FSM_ERROR;
 			context_data->last_error = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
-			Fsm_StateTransition(ctx,StreamStopping_EntryStateHandler);
 			break;
 	}
 
@@ -95,7 +99,6 @@ static FSM_ret StreamStopping_WaitingStateHandler(fsm_context *ctx, FsmEvent_t *
 		default:
 			ret_val = FSM_ERROR;
 			context_data->last_error = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
-			Fsm_StateTransition(ctx,StreamStopping_EntryStateHandler);
 			break;
 	}
 	return ret_val;
@@ -125,7 +128,6 @@ static FSM_ret StreamStopping_ResettingPowerCTL(fsm_context *ctx, FsmEvent_t *us
 		default:
 			ret_val = FSM_ERROR;
 			context_data->last_error = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
-			Fsm_StateTransition(ctx, StreamStopping_EntryStateHandler);
 			break;
 	}
 	return ret_val;

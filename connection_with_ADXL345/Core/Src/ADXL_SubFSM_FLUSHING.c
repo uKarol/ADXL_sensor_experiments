@@ -29,6 +29,11 @@ static FSM_ret StreamFlushingCheckFifo_StateHandler (fsm_context *ctx, FsmEvent_
 static FSM_ret StreamFlushingDataReadout_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 
 
+static void FlushingSubFsmErrorCallback()
+{
+	Fsm_StateTransition(&StreamFlushingFsmContext, StreamFlushingIdle_StateHandler);
+}
+
 ADXL_Errors_t ADXL_FSMFlushing_GetError()
 {
 	return StreamFlushingFsmData.last_error;
@@ -42,7 +47,7 @@ FSM_ret ADXL_FSMFlushing_ProcessEvent(FsmEvent_t *user_event)
 void Stream_FlushingSubFsmInit(fsm_set_event_callback event_cb)
 {
 	StreamFlushingFsmData.evt_callback = event_cb;
-	Fsm_Init(&StreamFlushingFsmContext, StreamFlushingIdle_StateHandler , &StreamFlushingFsmData, NULL);
+	Fsm_Init(&StreamFlushingFsmContext, StreamFlushingIdle_StateHandler , &StreamFlushingFsmData, FlushingSubFsmErrorCallback);
 }
 
 static FSM_ret StreamFlushingIdle_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
@@ -98,13 +103,11 @@ static FSM_ret StreamFlushingCheckFifo_StateHandler (fsm_context *ctx, FsmEvent_
 			{
 				ret_val = FSM_ERROR;
 				context_data->last_error = ADXL_ERR_DMA_PROBLEM;
-				Fsm_StateTransition(ctx, StreamFlushingIdle_StateHandler);
 			}
 			break;
 		default:
 			ret_val = FSM_ERROR;
 			context_data->last_error = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
-			Fsm_StateTransition(ctx, StreamFlushingIdle_StateHandler);
 	}
 	return ret_val;
 }
@@ -132,7 +135,6 @@ static FSM_ret StreamFlushingDataReadout_StateHandler (fsm_context *ctx, FsmEven
 				{
 					ret_val = FSM_ERROR;
 					context_data->last_error = ADXL_ERR_DMA_PROBLEM;
-					Fsm_StateTransition(ctx, StreamFlushingIdle_StateHandler);
 				}
 			}
 			break;
@@ -140,7 +142,6 @@ static FSM_ret StreamFlushingDataReadout_StateHandler (fsm_context *ctx, FsmEven
 		default:
 			ret_val = FSM_ERROR;
 			context_data->last_error = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
-			Fsm_StateTransition(ctx, StreamFlushingIdle_StateHandler);
 	}
 
 	return ret_val;

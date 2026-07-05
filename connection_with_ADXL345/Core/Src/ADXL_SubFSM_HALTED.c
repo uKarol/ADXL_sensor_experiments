@@ -28,10 +28,15 @@ static FSM_ret StreamHalted_SettingPowerCTL (fsm_context *ctx, FsmEvent_t *user_
 static FSM_ret StreamHalted_Waiting (fsm_context *ctx, FsmEvent_t *user_event);
 
 
+static void FlushingSubFsmErrorCallback()
+{
+	Fsm_StateTransition(&StreamHaltedFsmContext, StreamHalted_IdleStateHandler);
+}
+
 void Stream_HaltedSubFsmInit(fsm_set_event_callback event_cb)
 {
 	StreamHaltedFsmData.evt_callback = event_cb;
-	Fsm_Init(&StreamHaltedFsmContext, StreamHalted_IdleStateHandler , &StreamHaltedFsmData, NULL);
+	Fsm_Init(&StreamHaltedFsmContext, StreamHalted_IdleStateHandler , &StreamHaltedFsmData, FlushingSubFsmErrorCallback);
 }
 
 FSM_ret ADXL_FSMHalted_ProcessEvent(FsmEvent_t *user_event)
@@ -91,7 +96,6 @@ static FSM_ret StreamHalted_SettingPowerCTL (fsm_context *ctx, FsmEvent_t *user_
 			{
 				ret_val = FSM_ERROR;
 				context_data->last_error = ADXL_ERR_COMMUNICATION_LOST;
-				Fsm_StateTransition(ctx, StreamHalted_IdleStateHandler);
 			}
 
 			break;
@@ -110,7 +114,6 @@ static FSM_ret StreamHalted_SettingPowerCTL (fsm_context *ctx, FsmEvent_t *user_
 		default:
 			ret_val = FSM_ERROR;
 			context_data->last_error = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
-			Fsm_StateTransition(ctx, StreamHalted_IdleStateHandler);
 			break;
 	}
 
@@ -134,7 +137,6 @@ static FSM_ret StreamHalted_Waiting (fsm_context *ctx, FsmEvent_t *user_event)
 		default:
 			ret_val = FSM_ERROR;
 			context_data->last_error = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
-			Fsm_StateTransition(ctx, StreamHalted_IdleStateHandler);
 		break;
 	}
 

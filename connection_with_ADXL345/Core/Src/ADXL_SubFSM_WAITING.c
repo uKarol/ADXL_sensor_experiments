@@ -26,6 +26,11 @@ static FSM_ret StreamWaiting_IdleStateHandler (fsm_context *ctx, FsmEvent_t *use
 static FSM_ret StreamWaiting_CheckIntStatusStateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 static FSM_ret StreamWaiting_CheckFifoStateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 
+static void FSM_WaitingErrorCallback(void)
+{
+	Fsm_StateTransition(&StreamWaitingFsmContext, StreamWaiting_IdleStateHandler);
+}
+
 ADXL_Errors_t ADXL_FSMWaiting_GetError()
 {
 	return StreamWaitingFsmData.last_error;
@@ -40,7 +45,7 @@ void Stream_WaitingSubFsmInit(fsm_set_event_callback event_cb, uint8_t fifo_samp
 {
 	StreamWaitingFsmData.expected_size = fifo_samples;
 	StreamWaitingFsmData.evt_callback = event_cb;
-	Fsm_Init(&StreamWaitingFsmContext, StreamWaiting_IdleStateHandler , &StreamWaitingFsmData, NULL);
+	Fsm_Init(&StreamWaitingFsmContext, StreamWaiting_IdleStateHandler , &StreamWaitingFsmData, FSM_WaitingErrorCallback);
 }
 
 static FSM_ret StreamWaiting_IdleStateHandler(fsm_context *ctx, FsmEvent_t *user_event)
@@ -102,14 +107,13 @@ static FSM_ret StreamWaiting_CheckIntStatusStateHandler (fsm_context *ctx, FsmEv
 				{
 					ret_val = FSM_ERROR;
 					context_data->last_error = ADXL_ERR_DMA_PROBLEM;
-					Fsm_StateTransition(ctx, StreamWaiting_IdleStateHandler);
+
 				}
 			}
 			break;
 		default:
 				ret_val = FSM_ERROR;
 				context_data->last_error = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
-				Fsm_StateTransition(ctx, StreamWaiting_IdleStateHandler);
 			break;
 	}
 
@@ -138,7 +142,6 @@ static FSM_ret StreamWaiting_CheckFifoStateHandler (fsm_context *ctx, FsmEvent_t
 		default:
 			ret_val = FSM_ERROR;
 			context_data->last_error = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
-			Fsm_StateTransition(ctx, StreamWaiting_IdleStateHandler);
 			break;
 	}
 
