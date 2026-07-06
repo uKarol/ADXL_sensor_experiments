@@ -9,11 +9,15 @@
 #define INC_ADXL_FSM_H_
 
 #include "ADXL_driver.h"
+#include "fsm.h"
 
 typedef enum
 {
 	ADXL_EVT_EXTI_IRQ = FSM_BASIC_EVENT_NUM,
 	ADXL_EVT_FIFO_OVERRUN,
+	ADXL_EVT_UNEXPCETED_WATERMARK,
+	ADXL_EVT_UNEXEPECTED_IRQ,
+	ADXL_EVT_UNKNOWN_IRQ,
 	ADXL_EVT_FIFO_READY,
 	ADXL_EVT_SENSOR_ENABLED,
 	ADXL_EVT_FIFO_FLUSH_REQ,
@@ -28,8 +32,8 @@ typedef enum
 	ADXL_EVT_STOP_REQUEST,
 	ADXL_EVT_STREAM_HALTED,
 	ADXL_EVT_FIFO_CLEARED,
-	ADXL_EVT_I2C_TX_COMPLETED, // for non dma transmit
-	ADXL_EVT_I2C_RX_COMPLETED, // for non dma receive
+	ADXL_EVT_I2C_TX_COMPLETED, 
+	ADXL_EVT_I2C_RX_COMPLETED, 
 }ADXL_FSM_Events;
 
 typedef void (*fsm_error_callback)(ADXL_Errors_t CurrentError);
