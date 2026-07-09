@@ -11,7 +11,7 @@
 #include "ADXL_driver.h"
 #include "fsm.h"
 
-typedef enum
+enum
 {
 	ADXL_EVT_EXTI_IRQ = FSM_BASIC_EVENT_NUM,
 	ADXL_EVT_FIFO_OVERRUN,
@@ -34,7 +34,9 @@ typedef enum
 	ADXL_EVT_FIFO_CLEARED,
 	ADXL_EVT_I2C_TX_COMPLETED, 
 	ADXL_EVT_I2C_RX_COMPLETED, 
-}ADXL_FSM_Events;
+};
+
+typedef uint16_t ADXL_FSM_Events;
 
 typedef void (*fsm_error_callback)(ADXL_Errors_t CurrentError);
 typedef void (*fsm_set_event_callback)(ADXL_FSM_Events evt);

@@ -25,7 +25,8 @@ typedef enum
 	ADXL_ERR_COMMUNICATION_LOST,	// not recoverable, reinit required
 	ADXL_ERR_DMA_PROBLEM,			// not recoverable, reinit required
 	ADXL_ERR_UNEXPECTED_BEHAVIOUR,	// not recoverable, reinit required
-	ADXL_ERR_UNEXPECTED_REG_VAL		// not recoverable, reinit required
+	ADXL_ERR_UNEXPECTED_REG_VAL,		// not recoverable, reinit required
+	ADXL_ERR_UNEXPECTED_WATERMARK
 }ADXL_Errors_t;
 
 typedef enum
@@ -42,7 +43,11 @@ typedef enum
 	STREAM_COMPLETED,
 	STREAM_IN_PROGRESS,
 	STREAM_ERROR,
-	STREAM_IDLE
+	STREAM_HALTED,
+	STREAM_WAITING,
+	STREAM_STOPPING,
+	STREAM_FLUSHING,
+	STREAM_UNEXPECTED_IRQ,
 }ADXL_StreamStatus;
 
 typedef struct

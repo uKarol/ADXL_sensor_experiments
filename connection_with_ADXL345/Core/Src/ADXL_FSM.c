@@ -65,7 +65,7 @@ void ADXL_StreamReset()
 	Stream_StoppingReset();
 	Stream_HaltedReset();
 	Stream_UnexpectedIRQReset();
-	StreamFsmData.current_state = STREAM_IDLE;
+
 	StreamFsmData.readout_num = 0;
 	StreamFsmData.stream_errors.error_code = ADXL_ERR_NO_ERROR;
 	Fsm_StateTransition(&StreamFsmContext, StreamStopping_StateHandler);
@@ -74,7 +74,6 @@ void ADXL_StreamReset()
 
 static void ADXL_FSM_ErrorCallback()
 {
-	StreamFsmData.current_state = STREAM_ERROR;
 	Fsm_StateTransition(&StreamFsmContext, StreamError_StateHandler);
 }
 
@@ -108,6 +107,7 @@ static FSM_ret StreamStopping_StateHandler (fsm_context *ctx, FsmEvent_t *user_e
 	switch(current_event)
 	{
 		case FSM_INITIAL_EVENT:
+			context_data->current_state = STREAM_STOPPING;
 			user_event->user_event = ADXL_EVT_STOP_STREAM; // fallthrough
 		case ADXL_EVT_STOP_STREAM: // fallthrough
 		case ADXL_EVT_I2C_TX_COMPLETED: // fallthrough
@@ -147,6 +147,7 @@ static FSM_ret StreamHalted_StateHandler (fsm_context *ctx, FsmEvent_t *user_eve
 	switch(current_event)
 	{
 		case FSM_INITIAL_EVENT:
+			context_data->current_state = STREAM_HALTED;
 			break;
 		case ADXL_EVT_START_STREAM: // fallthrough
 		case ADXL_EVT_I2C_TX_COMPLETED: // fallthrough
@@ -186,6 +187,7 @@ static FSM_ret StreamFlushing_StateHandler (fsm_context *ctx, FsmEvent_t *user_e
 	switch(current_event)
 	{
 		case FSM_INITIAL_EVENT:
+			context_data->current_state = STREAM_FLUSHING;
 			user_event->user_event = ADXL_EVT_FIFO_FLUSH_REQ; // fallthough
 		case ADXL_EVT_FIFO_FLUSH_REQ: // fallthrough
 		case ADXL_EVT_I2C_RX_COMPLETED:
@@ -221,14 +223,13 @@ static FSM_ret StreamFlushing_StateHandler (fsm_context *ctx, FsmEvent_t *user_e
 FSM_ret StreamWaiting_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 {
 	FSM_ret ret_val = FSM_ERROR;
-
 	ADXL_FSM_Events current_event = (ADXL_FSM_Events)user_event->user_event;
 	StreamCtxData_t *context_data = (StreamCtxData_t*)ctx->user_data;
 
 	switch(current_event)
 	{
 		case FSM_INITIAL_EVENT:
-			context_data->current_state = STREAM_IDLE;
+			context_data->current_state = STREAM_WAITING;
 			break;
 		case ADXL_EVT_EXTI_IRQ: // fallthrough
 		case ADXL_EVT_I2C_RX_COMPLETED:
@@ -245,7 +246,6 @@ FSM_ret StreamWaiting_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 
 			if( ADXL_ReadMultipleRegsNonBlocking(DATAX0_REG, ADXL_raw_data, ONE_SAMPLE_SIZE) == ADXL_ERR_NO_ERROR)
 			{
-				context_data->current_state = STREAM_IN_PROGRESS;
 				ret_val = FSM_OK;
 				Fsm_StateTransition(ctx, StreamInProgress_StateHandler);
 			}
@@ -275,6 +275,7 @@ FSM_ret StreamInProgress_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 	switch(current_event)
 	{
 		case FSM_INITIAL_EVENT:
+			context_data->current_state = STREAM_IN_PROGRESS;
 			break;
 		case ADXL_EVT_I2C_RX_COMPLETED:
 
@@ -368,6 +369,7 @@ static FSM_ret StreamUnexpectedIRQ_StateHandler (fsm_context *ctx, FsmEvent_t *u
 	switch(current_event)
 	{
 		case FSM_INITIAL_EVENT:
+			context_data->current_state = STREAM_UNEXPECTED_IRQ;
 			user_event->user_event = ADXL_EVT_UNEXEPECTED_IRQ;
 		case ADXL_EVT_I2C_TX_COMPLETED:
 		case ADXL_EVT_I2C_RX_COMPLETED:
@@ -384,6 +386,9 @@ static FSM_ret StreamUnexpectedIRQ_StateHandler (fsm_context *ctx, FsmEvent_t *u
 			ret_val = FSM_ERROR;
 			break;
 		case ADXL_EVT_UNEXPCETED_WATERMARK:
+			ADXL_SetError(ADXL_ERR_UNEXPECTED_WATERMARK, context_data->current_state, current_event);
+			ret_val = FSM_ERROR;
+			break;
 		case ADXL_EVT_UNKNOWN_IRQ:
 		default:
 			ret_val = FSM_ERROR;

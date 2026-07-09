@@ -16,15 +16,15 @@ typedef enum
     FSM_ERROR,
 }FSM_ret;
 
-typedef enum
+enum
 {
     FSM_INITIAL_EVENT = 0,
     FSM_BASIC_EVENT_NUM,
-}FSM_Basic_Event;
+};
 
 typedef struct
 {
-	uint8_t user_event;
+	uint16_t user_event;
 	void *user_data;
 }FsmEvent_t;
 
