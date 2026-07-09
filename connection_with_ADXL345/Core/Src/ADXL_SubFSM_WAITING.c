@@ -99,7 +99,6 @@ static FSM_ret StreamWaiting_CheckIntStatusStateHandler (fsm_context *ctx, FsmEv
 			if(context_data->dma_out_data & ADXL_INT_ENABLE_OVERRUN)
 			{
 				context_data->evt_callback(ADXL_EVT_FIFO_OVERRUN);
-				context_data->last_error = ADXL_ERR_OVERRUN;
 				Fsm_StateTransition(ctx, StreamWaiting_IdleStateHandler);
 
 			}

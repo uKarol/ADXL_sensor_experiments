@@ -261,6 +261,9 @@ FSM_ret StreamWaiting_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 				ADXL_SetError(ADXL_ERR_COMMUNICATION_LOST, context_data->current_state, current_event);
 			}
 			break;
+		case ADXL_EVT_FIFO_OVERRUN:
+			ADXL_SetError(ADXL_ERR_OVERRUN, context_data->current_state, current_event);
+			break;
 		case ADXL_EVT_STOP_REQUEST:
 			Fsm_StateTransition(ctx,StreamStopping_StateHandler);
 			ret_val = FSM_OK;
