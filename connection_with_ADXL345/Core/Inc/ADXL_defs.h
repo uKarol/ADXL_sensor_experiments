@@ -29,18 +29,25 @@
 #define FIFO_CTL 0x38
 #define FIFO_STATUS 0x39
 
+#define FIFO_CTL_SAMPLES_MASK 0x1F
 // adxl registers
 
 #define POWER_CTL 0x2DU
-
+#define FIFO_ENTRIES_BIT_MSK 0x3FU
 // adxl bits
 #define POWER_CTL_MEASURE (1U<<3U)
 
 #define ADXL_INT_ENABLE_WATERMARK (1U<<1)
 #define ADXL_INT_ENABLE_OVERRUN (1U<<0)
 
+#define ADXL_INT_SOURCE_WATERMARK (1U<<1)
+#define ADXL_INT_SOURCE_OVERRUN (1U<<0)
+
 #define ADXL_FIFO_CTL_STREAM (1U<<7)
 #define ADFL_FIFO_16_SAMPLES (1U<<4)
+#define ADFL_FIFO_8_SAMPLES (1U<<3)
 
+#define MAX_NUMBER_OF_SAMPLES 32U // number of samples per watermark
+#define MAX_READOUT_SIZE (ONE_SAMPLE_SIZE * MAX_NUMBER_OF_SAMPLES)
 
 #endif /* INC_ADXL_DEFS_H_ */

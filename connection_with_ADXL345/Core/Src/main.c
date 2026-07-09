@@ -18,14 +18,17 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "dma.h"
 #include "i2c.h"
 #include "usart.h"
+#include "tim.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stdio.h"
 #include "ADXL_driver.h"
+#include "ADXL_i2c_conn.h"
 #include "MeasurementFSM.h"
 /* USER CODE END Includes */
 
@@ -68,6 +71,22 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	  ADXL_INT1InterruptHandler();
   }
 }
+
+void HAL_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+	if(hi2c == &hi2c1)
+	{
+		ADXL_I2CTxComplete();
+	}
+}
+
+void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+	if(hi2c == &hi2c1)
+	{
+		ADXL_I2CRxComplete();
+	}
+}
 /* USER CODE END 0 */
 
 /**
@@ -99,22 +118,31 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_LPUART1_UART_Init();
   MX_I2C1_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  MeasurementInitStruct initdata = {16};
 
-
-  MeasurementFSM_setup(&measure_ctx);
+  MeasurementFSM_setup(&measure_ctx, &initdata);
 
   while (1)
   {
+	  ADXL_task();
 	  MeasurementFSM_run(&measure_ctx);
-	  HAL_Delay(10);
+
+//	  if(ADXL_GetStreamStatus() == STREAM_COMPLETED)
+//	  {
+//		  captured_data = ADXL_GetStreamedData();
+//		  HAL_UART_Transmit(&hlpuart1, captured_data, 96, 1000);
+//		  ADXL_ReleaseDataBuffer();
+//	  }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
