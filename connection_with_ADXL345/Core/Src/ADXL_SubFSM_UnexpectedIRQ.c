@@ -24,7 +24,7 @@ static StreamUnexpectedIRQCtxData_t StreamUnexpectedIRQFsmData;
 static fsm_context StreamUnexpectedIRQFsmContext;
 
 static FSM_ret StreamUnexpectedIRQ_EntryStateHandler (fsm_context *ctx, FsmEvent_t *user_event);
-static FSM_ret StreamUnexpectedIRQ_CheckingFifoStatus (fsm_context *ctx, FsmEvent_t *user_event);
+static FSM_ret StreamUnexpectedIRQ_CheckingIntStatus (fsm_context *ctx, FsmEvent_t *user_event);
 static FSM_ret StreamUnexpectedIRQ_WaitingStateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 
 void Stream_UnexpectedIRQReset()
@@ -71,7 +71,7 @@ static FSM_ret StreamUnexpectedIRQ_EntryStateHandler(fsm_context *ctx, FsmEvent_
 			context_data->last_error = ADXL_ERR_NO_ERROR;
 			if(ADXLConn_GetCurrentOperation()== ADXL_OP_NO_OPERATION)
 			{
-				Fsm_StateTransition(ctx, StreamUnexpectedIRQ_CheckingFifoStatus);
+				Fsm_StateTransition(ctx, StreamUnexpectedIRQ_CheckingIntStatus);
 			}
 			else
 			{
@@ -99,7 +99,7 @@ static FSM_ret StreamUnexpectedIRQ_WaitingStateHandler(fsm_context *ctx, FsmEven
 			break;
 		case ADXL_EVT_I2C_TX_COMPLETED: // fallthrough
 		case ADXL_EVT_I2C_RX_COMPLETED:
-				Fsm_StateTransition(ctx, StreamUnexpectedIRQ_CheckingFifoStatus);
+				Fsm_StateTransition(ctx, StreamUnexpectedIRQ_CheckingIntStatus);
 			break;
 		default:
 			ret_val = FSM_ERROR;
@@ -109,7 +109,7 @@ static FSM_ret StreamUnexpectedIRQ_WaitingStateHandler(fsm_context *ctx, FsmEven
 	return ret_val;
 }
 
-static FSM_ret StreamUnexpectedIRQ_CheckingFifoStatus(fsm_context *ctx, FsmEvent_t *user_event)
+static FSM_ret StreamUnexpectedIRQ_CheckingIntStatus(fsm_context *ctx, FsmEvent_t *user_event)
 {
 	FSM_ret ret_val = FSM_OK;
 	ADXL_FSM_Events current_event = (ADXL_FSM_Events)user_event->user_event;

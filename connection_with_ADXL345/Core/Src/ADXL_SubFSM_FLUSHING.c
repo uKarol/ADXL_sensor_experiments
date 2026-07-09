@@ -17,6 +17,7 @@ typedef struct
 	ADXL_Errors_t last_error;
 	uint8_t expected_size;
 	uint8_t dma_out_data;
+	uint8_t dma_readout[6];
 	fsm_set_event_callback evt_callback;
 	uint8_t readout_num;
 }StreamFlushingCtxData_t;
@@ -78,7 +79,7 @@ static FSM_ret StreamFlushingIdle_StateHandler (fsm_context *ctx, FsmEvent_t *us
 			else
 			{
 				ret_val = FSM_ERROR;
-				context_data->last_error = ADXL_ERR_DMA_PROBLEM;
+				context_data->last_error = ADXL_ERR_COMMUNICATION_LOST;
 			}
 		break;
 		default:
@@ -87,8 +88,7 @@ static FSM_ret StreamFlushingIdle_StateHandler (fsm_context *ctx, FsmEvent_t *us
 
 	return ret_val;
 }
-
-static uint8_t dma_readout[6];
+ 
 
 static FSM_ret StreamFlushingCheckFifo_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 {
@@ -102,14 +102,14 @@ static FSM_ret StreamFlushingCheckFifo_StateHandler (fsm_context *ctx, FsmEvent_
 			break;
 		case ADXL_EVT_I2C_RX_COMPLETED:
 			context_data->expected_size = (context_data->dma_out_data & FIFO_ENTRIES_BIT_MSK);
-			if( ADXL_ReadMultipleRegsNonBlocking(DATAX0_REG, dma_readout, ONE_SAMPLE_SIZE) == ADXL_ERR_NO_ERROR)
+			if(context_data->expected_size == 0)
 			{
-				Fsm_StateTransition(ctx, StreamFlushingDataReadout_StateHandler);
+				context_data->evt_callback(ADXL_EVT_FIFO_CLEARED);
+				Fsm_StateTransition(ctx, StreamFlushingIdle_StateHandler);				
 			}
 			else
 			{
-				ret_val = FSM_ERROR;
-				context_data->last_error = ADXL_ERR_DMA_PROBLEM;
+				Fsm_StateTransition(ctx, StreamFlushingDataReadout_StateHandler);
 			}
 			break;
 		default:
@@ -127,6 +127,11 @@ static FSM_ret StreamFlushingDataReadout_StateHandler (fsm_context *ctx, FsmEven
 	switch(current_event)
 	{
 		case FSM_INITIAL_EVENT:
+			if( ADXL_ReadMultipleRegsNonBlocking(DATAX0_REG, context_data->dma_readout, ONE_SAMPLE_SIZE) != ADXL_ERR_NO_ERROR)
+			{
+				ret_val = FSM_ERROR;
+				context_data->last_error = ADXL_ERR_COMMUNICATION_LOST;
+			}
 			break;
 		case ADXL_EVT_I2C_RX_COMPLETED:
 			context_data->readout_num ++;
@@ -138,10 +143,10 @@ static FSM_ret StreamFlushingDataReadout_StateHandler (fsm_context *ctx, FsmEven
 			}
 			else
 			{
-				if( ADXL_ReadMultipleRegsNonBlocking(DATAX0_REG, dma_readout, ONE_SAMPLE_SIZE) != ADXL_ERR_NO_ERROR)
+				if( ADXL_ReadMultipleRegsNonBlocking(DATAX0_REG, context_data->dma_readout, ONE_SAMPLE_SIZE) != ADXL_ERR_NO_ERROR)
 				{
 					ret_val = FSM_ERROR;
-					context_data->last_error = ADXL_ERR_DMA_PROBLEM;
+					context_data->last_error = ADXL_ERR_COMMUNICATION_LOST;
 				}
 			}
 			break;

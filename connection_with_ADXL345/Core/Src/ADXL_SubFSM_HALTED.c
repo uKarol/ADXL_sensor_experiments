@@ -17,6 +17,7 @@ typedef struct
 {
 	ADXL_Errors_t last_error;
 	uint8_t dma_out_data;
+	uint8_t data_in;
 	fsm_set_event_callback evt_callback;
 }StreamHaltedCtxData_t;
 
@@ -54,7 +55,6 @@ ADXL_Errors_t ADXL_FSMHalted_GetError()
 	return StreamHaltedFsmData.last_error;
 }
 
-static volatile uint8_t data_in;
 
 static FSM_ret StreamHalted_IdleStateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 {
@@ -67,8 +67,8 @@ static FSM_ret StreamHalted_IdleStateHandler (fsm_context *ctx, FsmEvent_t *user
 		case FSM_INITIAL_EVENT:
 			break;
 		case ADXL_EVT_START_STREAM:
-			data_in = POWER_CTL_MEASURE;
-			if(ADXL_WriteRegNonBlocking(POWER_CTL, &data_in) == ADXL_ERR_NO_ERROR)
+			context_data->data_in = POWER_CTL_MEASURE;
+			if(ADXL_WriteRegNonBlocking(POWER_CTL, &(context_data->data_in)) == ADXL_ERR_NO_ERROR)
 			{
 				Fsm_StateTransition(ctx, StreamHalted_SettingPowerCTL);
 			}
@@ -84,7 +84,7 @@ static FSM_ret StreamHalted_IdleStateHandler (fsm_context *ctx, FsmEvent_t *user
 
 	return ret_val;
 }
-volatile uint8_t helper_data;
+
 static FSM_ret StreamHalted_SettingPowerCTL (fsm_context *ctx, FsmEvent_t *user_event)
 {
 	FSM_ret ret_val = FSM_OK;
@@ -97,7 +97,7 @@ static FSM_ret StreamHalted_SettingPowerCTL (fsm_context *ctx, FsmEvent_t *user_
 			break;
 		case ADXL_EVT_I2C_TX_COMPLETED:
 
-			if(ADXL_ReadRegNonBlocking(POWER_CTL, &helper_data)!= ADXL_ERR_NO_ERROR)
+			if(ADXL_ReadRegNonBlocking(POWER_CTL, &(context_data->dma_out_data))!= ADXL_ERR_NO_ERROR)
 			{
 				ret_val = FSM_ERROR;
 				context_data->last_error = ADXL_ERR_COMMUNICATION_LOST;
@@ -105,7 +105,7 @@ static FSM_ret StreamHalted_SettingPowerCTL (fsm_context *ctx, FsmEvent_t *user_
 
 			break;
 		case ADXL_EVT_I2C_RX_COMPLETED:
-			if(helper_data == POWER_CTL_MEASURE)
+			if(context_data->dma_out_data == POWER_CTL_MEASURE)
 			{
 				EvtTimerStart(100);
 				Fsm_StateTransition(ctx, StreamHalted_Waiting);

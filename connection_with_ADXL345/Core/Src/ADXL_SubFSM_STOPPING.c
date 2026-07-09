@@ -18,6 +18,7 @@ typedef struct
 	ADXL_Errors_t last_error;
 	uint8_t dma_out_data;
 	fsm_set_event_callback evt_callback;
+	uint8_t data_in;
 }StreamStoppingCtxData_t;
 
 static StreamStoppingCtxData_t StreamStoppingFsmData;
@@ -54,8 +55,6 @@ ADXL_Errors_t ADXL_FSMStopping_GetError()
 {
 	return StreamStoppingFsmData.last_error;
 }
-
-static uint8_t data_in;
 
 static FSM_ret StreamStopping_EntryStateHandler(fsm_context *ctx, FsmEvent_t *user_event)
 {
@@ -118,8 +117,8 @@ static FSM_ret StreamStopping_ResettingPowerCTL(fsm_context *ctx, FsmEvent_t *us
 	switch (current_event)
 	{
 		case FSM_INITIAL_EVENT:
-			data_in = 0;
-			if(ADXL_WriteRegNonBlocking(POWER_CTL, &data_in) != ADXL_ERR_NO_ERROR)
+			context_data->data_in = 0;
+			if(ADXL_WriteRegNonBlocking(POWER_CTL, &(context_data->data_in)) != ADXL_ERR_NO_ERROR)
 			{
 				ret_val = FSM_ERROR;
 				context_data->last_error = ADXL_ERR_COMMUNICATION_LOST;

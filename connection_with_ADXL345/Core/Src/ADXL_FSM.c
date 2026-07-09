@@ -51,14 +51,21 @@ typedef struct
 static StreamCtxData_t StreamFsmData;
 static fsm_context StreamFsmContext;
 
-void ADXL_SetError(ADXL_Errors_t error_code, ADXL_StreamStatus state, ADXL_FSM_Events evt)
+void ADXL_FSM_GetLastErrorInfo(ADXL_Err_Desc_t *ErrorInfo)
+{
+	ErrorInfo->error_code = StreamFsmData.stream_errors.error_code;
+	ErrorInfo->evt = StreamFsmData.stream_errors.evt;
+	ErrorInfo->state = StreamFsmData.stream_errors.state;
+}
+
+static void ADXL_SetError(ADXL_Errors_t error_code, ADXL_StreamStatus state, ADXL_FSM_Events evt)
 {
 	StreamFsmData.stream_errors.error_code = error_code;
 	StreamFsmData.stream_errors.state = state;
 	StreamFsmData.stream_errors.evt = evt;
 }
 
-void ADXL_StreamReset()
+static void ADXL_StreamReset()
 {
 	Stream_WaitingReset();
 	Stream_FlushingReset();
