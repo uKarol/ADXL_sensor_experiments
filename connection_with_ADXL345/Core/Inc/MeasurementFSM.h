@@ -20,9 +20,9 @@ typedef enum
 
 typedef enum
 {
-	ADXL_MEAS_NO_ERROR,
-	ADXL_INIT_FAILURE,
-	ADXL_READ_FAILURE,
+	MEAS_NO_ERROR,
+	MEAS_INIT_FAILURE,
+	MEAS_READ_FAILURE,
 }measurement_error_t;
 
 typedef struct
@@ -39,7 +39,12 @@ typedef struct
 	uint8_t number_of_fifo_samples;
 }MeasurementInitStruct;
 
-void MeasurementFSM_setup(MeasurementFSM_context_t *context, MeasurementInitStruct *init_data);
-void MeasurementFSM_run(MeasurementFSM_context_t *context);
+typedef void (*measurement_err_callback)(void);
 
+void MeasurementFSM_setup(MeasurementFSM_context_t *context, MeasurementInitStruct *init_data);
+void Measurement_task();
+measurement_error_t Measurement_Init(MeasurementInitStruct *init_data, measurement_err_callback error_cb);
+void MeasurementTransmitCompleted();
+void MeasurementRxCompleted();
+void MeasurementADXL_DataReady();
 #endif /* INC_MEASUREMENTFSM_H_ */

@@ -330,8 +330,7 @@ FSM_ret StreamCompleted_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 	{
 		case FSM_INITIAL_EVENT:
 			context_data->current_state = STREAM_COMPLETED;
-			break;
-		case ADXL_EVT_STREAM_FINISHED:
+			MeasurementADXL_DataReady();
 			break;
 		case ADXL_EVT_BUFFER_RELEASE_REQ:
 			Fsm_StateTransition(ctx, StreamWaiting_StateHandler);

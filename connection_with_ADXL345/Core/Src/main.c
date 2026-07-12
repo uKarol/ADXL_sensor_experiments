@@ -87,6 +87,22 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
 		ADXL_I2CRxComplete();
 	}
 }
+
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+	MeasurementTransmitCompleted();
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	MeasurementRxCompleted();
+}
+
+void meas_error_handler()
+{
+
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -96,7 +112,6 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-  MeasurementFSM_context_t measure_ctx;
 
   /* USER CODE END 1 */
 
@@ -130,12 +145,12 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   MeasurementInitStruct initdata = {16};
 
-  MeasurementFSM_setup(&measure_ctx, &initdata);
+  Measurement_Init(&initdata, meas_error_handler);
 
   while (1)
   {
 	  ADXL_task();
-	  MeasurementFSM_run(&measure_ctx);
+	  Measurement_task();
 
 //	  if(ADXL_GetStreamStatus() == STREAM_COMPLETED)
 //	  {

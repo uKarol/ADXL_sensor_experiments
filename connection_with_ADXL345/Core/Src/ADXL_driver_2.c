@@ -130,14 +130,17 @@ static ADXL_Errors_t ADXL_RegSequencer(const RegConfDesc *reg_sequence, uint8_t 
 
 void ADXL_task()
 {
-	FsmEvent_t current_event;
-	if( SimpleQueueGet(&ADXL_queue, (void*)(&current_event), sizeof(current_event)) == QUEUE_OK)
+	if((CurrentState.DriverState == DRIVER_READY) || (CurrentState.DriverState == DRIVER_HALTED))
 	{
-		ADXL_FSM_ProcessEvent(&current_event);
-	}
-	else
-	{
-		// no event in queue
+		FsmEvent_t current_event;
+		if( SimpleQueueGet(&ADXL_queue, (void*)(&current_event), sizeof(current_event)) == QUEUE_OK)
+		{
+			ADXL_FSM_ProcessEvent(&current_event);
+		}
+		else
+		{
+			// no event in queue
+		}
 	}
 }
 

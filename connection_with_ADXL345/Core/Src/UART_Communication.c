@@ -38,9 +38,19 @@ TransmissionStatus_t UART_Com_TransmitData(int16_t Xdata, int16_t Ydata, int16_t
 TransmissionStatus_t UART_Com_TransmitString(char *str)
 {
 	TransmissionStatus_t ret_val = TRANSMIT_FAILURE;
-	if( HAL_UART_Transmit(&hlpuart1, str, strlen(str), 100) != HAL_OK )
+	if( HAL_UART_Transmit(&hlpuart1, str, strlen(str), 100) == HAL_OK )
 	{
 		ret_val = TRANSMIT_OK;
+	}
+	return ret_val;
+}
+
+ReceptionStatus_t UART_Com_ReceiveNonBlocking(uint8_t *bytes, uint8_t size)
+{
+	ReceptionStatus_t ret_val = RECEPTION_FAILURE;
+	if(HAL_UART_Receive_IT(&hlpuart1, bytes, size) == HAL_OK)
+	{
+		ret_val = RECPETION_OK;
 	}
 	return ret_val;
 }
