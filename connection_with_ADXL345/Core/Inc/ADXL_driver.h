@@ -50,9 +50,20 @@ typedef enum
 	STREAM_UNEXPECTED_IRQ,
 }ADXL_StreamStatus;
 
+typedef void (*adxl_external_callback)(void);
+
+typedef struct
+{
+	adxl_external_callback adxl_started_callback;
+	adxl_external_callback adxl_stopped_callback;
+	adxl_external_callback adxl_completed_callback;
+	adxl_external_callback adxl_error_detected_callback;
+}helper_external_callbacks;
+
 typedef struct
 {
 	uint8_t FifoSamples;
+	helper_external_callbacks *helper_callbacks;
 }ADXL_Init_t;
 
 #define ONE_SAMPLE_SIZE 6U // sample size in bytes

@@ -34,6 +34,9 @@ enum
 	MEASUREMENT_EVT_TX_COMPLETED = FSM_BASIC_EVENT_NUM,
 	MEASUREMENT_EVT_DATA_READY,
 	MEASUREMENT_EVT_RX_COMPLETED,
+	MEASUREMENT_EVT_STARTED,
+	MEASUREMENT_EVT_STOPPED,
+	MEASUREMENT_EVT_ADXL_ERROR_DETECTED,
 };
 
 uint8_t measurement_queue_buffer[EVT_BUFFER_CAPACITY];
@@ -43,12 +46,27 @@ static FSM_ret MeasurementWaiting_StateHandler (fsm_context *ctx, FsmEvent_t *us
 static FSM_ret MeasurementProcessing_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 static FSM_ret MeasurementGetSize_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 static FSM_ret MeasurementError_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
+static FSM_ret MeasurementStarting_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
+static FSM_ret MeasurementStopping_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 void Measurement_SetEvent(MeasurementEvt_t evt);
+
+void MeasurementADXL_Started();
+void MeasurementADXL_Stopped();
+void MeasurementADXL_DataReady();
+void MeasurementADXL_ErrorDetected();
 
 enum
 {
 	ADXL_INIT_FAILED,
 	ADXL_INIT_SUCCESSFULL,
+};
+
+helper_external_callbacks adxl_callbacks =
+{
+		.adxl_started_callback = MeasurementADXL_Started,
+		.adxl_stopped_callback = MeasurementADXL_Stopped,
+		.adxl_completed_callback = MeasurementADXL_DataReady,
+		.adxl_error_detected_callback = MeasurementADXL_ErrorDetected
 };
 
 static fsm_context MeasurementFsmContext;
@@ -59,6 +77,21 @@ static MeasurementFSM_Data_t MeasurementFsmData;
 static void MeasurementErrorCallback()
 {
 	Fsm_StateTransition(&MeasurementFsmContext, MeasurementError_StateHandler);
+}
+
+void MeasurementADXL_ErrorDetected()
+{
+	Measurement_SetEvent(MEASUREMENT_EVT_ADXL_ERROR_DETECTED);
+}
+
+void MeasurementADXL_Started()
+{
+	Measurement_SetEvent(MEASUREMENT_EVT_STARTED);
+}
+
+void MeasurementADXL_Stopped()
+{
+	Measurement_SetEvent(MEASUREMENT_EVT_STOPPED);
 }
 
 void MeasurementADXL_DataReady()
@@ -86,7 +119,7 @@ measurement_error_t Measurement_Init(MeasurementInitStruct *init_data, measureme
 	measurement_error_t ret_val = MEAS_INIT_FAILURE;
 	SimpleQueueInit(&MeasurementQueue, measurement_queue_buffer, EVT_BUFFER_CAPACITY);
 
-	ADXL_Init_t init_struct = {init_data->number_of_fifo_samples};
+	ADXL_Init_t init_struct = {init_data->number_of_fifo_samples, &adxl_callbacks};
 
 	if( ADXL_RegInitAlternative(&init_struct) == ADXL_SUCCESS )
 	{
@@ -188,8 +221,44 @@ static FSM_ret MeasurementGetSize_StateHandler (fsm_context *ctx, FsmEvent_t *us
 				 context_data->expected_size = 1;
 			 }
 
-			 Fsm_StateTransition(ctx, MeasurementProcessing_StateHandler);
+			 Fsm_StateTransition(ctx, MeasurementStarting_StateHandler);
 			 break;
+	}
+	return ret_val;
+}
+
+static FSM_ret MeasurementStarting_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
+{
+	FSM_ret ret_val = FSM_OK;
+	MeasurementEvt_t current_event = (MeasurementEvt_t)user_event->user_event;
+	MeasurementFSM_Data_t *context_data = (MeasurementFSM_Data_t*)ctx->user_data;
+
+	switch(current_event)
+	{
+		case FSM_INITIAL_EVENT:
+			ADXL_StartStreamMeasurements();
+			break;
+		case MEASUREMENT_EVT_STARTED:
+			Fsm_StateTransition(ctx, MeasurementProcessing_StateHandler);
+			break;
+	}
+	return ret_val;
+}
+
+static FSM_ret MeasurementStopping_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
+{
+	FSM_ret ret_val = FSM_OK;
+	MeasurementEvt_t current_event = (MeasurementEvt_t)user_event->user_event;
+	MeasurementFSM_Data_t *context_data = (MeasurementFSM_Data_t*)ctx->user_data;
+
+	switch(current_event)
+	{
+		case FSM_INITIAL_EVENT:
+			ADXL_StopStreamMeasurements();
+			break;
+		case MEASUREMENT_EVT_STOPPED:
+			Fsm_StateTransition(ctx, MeasurementWaiting_StateHandler);
+			break;
 	}
 	return ret_val;
 }
@@ -203,7 +272,6 @@ static FSM_ret MeasurementProcessing_StateHandler (fsm_context *ctx, FsmEvent_t 
 	switch(current_event)
 	{
 		case FSM_INITIAL_EVENT:
-			ADXL_StartStreamMeasurements();
 			break;
 
 		case MEASUREMENT_EVT_DATA_READY:
@@ -223,9 +291,7 @@ static FSM_ret MeasurementProcessing_StateHandler (fsm_context *ctx, FsmEvent_t 
 			if(context_data->measure_ctr >= context_data->expected_size)
 			{
 				context_data->measure_ctr = 0;
-
-				ADXL_StopStreamMeasurements();
-				Fsm_StateTransition(ctx, MeasurementWaiting_StateHandler);
+				Fsm_StateTransition(ctx, MeasurementStopping_StateHandler);
 			}
 			break;
 	}
@@ -249,74 +315,4 @@ static FSM_ret MeasurementError_StateHandler (fsm_context *ctx, FsmEvent_t *user
 	return ret_val;
 }
 
-//void MeasurementFSM_run(MeasurementFSM_context_t *context)
-//{
-//	uint8_t *captured_data;
-//
-//	switch(context->current_state)
-//	{
-//		case MEASURE_PROCESSING:
-//			ADXL_StreamStatus stream_status= ADXL_GetStreamStatus();
-//			if(stream_status == STREAM_COMPLETED)
-//			{
-//				captured_data = ADXL_GetStreamedData();
-//				UART_Com_TransmitString("OK\n");
-//				UART_Com_TransmitRawData(captured_data, (context->number_of_fifo_samples*ONE_SAMPLE_SIZE));
-//				ADXL_ReleaseDataBuffer();
-//				context->measure_ctr++;
-//				if(context->measure_ctr >= context->expected_size)
-//				{
-//					context->measure_ctr = 0;
-//					context->current_state = MEASURE_WAITING;
-//					ADXL_StopStreamMeasurements();
-//				}
-//			}
-//			else if(stream_status == STREAM_ERROR)
-//			{
-//				context->current_state = MEASURE_ERROR;
-//				context->current_error = ADXL_READ_FAILURE;
-//			}
-//			break;
-//
-//		 case MEASURE_WAITING:
-//			 uint8_t sig;
-////			 ADXL_FIFO_Check();
-//			if( UART_Com_CheckStartSignal(&sig) == RECPETION_OK )
-//			{
-//				if(sig == START_SIGNAL)
-//				{
-//					context->current_state = MEASURE_GET_SIZE;
-//				}
-//				else if(sig == GET_CFG_SIGNAL)
-//				{
-//					char readout[150] = "";
-//					ADXL_GetConfig(readout, 150);
-//					UART_Com_TransmitString(readout);
-//				}
-//			}
-//			break;
-//
-//		 case MEASURE_GET_SIZE:
-//			 uint16_t number_of_samples = 0;
-//			 UART_Com_TransmitString("START");
-//			 if( UART_Com_GetSize(&number_of_samples) == RECPETION_OK)
-//			 {
-//				 context->expected_size = number_of_samples;
-//			 }
-//			 else
-//			 {
-//				 context->expected_size = 1;
-//			 }
-//			  ADXL_StartStreamMeasurements();
-//			 context->current_state = MEASURE_PROCESSING;
-//		break;
-//
-//		 case MEASURE_ERROR:
-//			UART_Com_TransmitError(context->current_error);
-//			break;
-//
-//		default:
-//			/* shall never occure */
-//			break;
-//	  }
-//}
+

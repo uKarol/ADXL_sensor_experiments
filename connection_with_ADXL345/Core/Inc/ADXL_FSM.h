@@ -36,6 +36,8 @@ enum
 	ADXL_EVT_I2C_RX_COMPLETED, 
 };
 
+
+
 typedef uint16_t ADXL_FSM_Events;
 
 typedef void (*fsm_error_callback)(ADXL_Errors_t CurrentError);
@@ -44,7 +46,7 @@ typedef void (*fsm_set_event_callback)(ADXL_FSM_Events evt);
 #define EVT_BUFFER_CAPACITY (10U * sizeof(FsmEvent_t))
 
 uint8_t* ADXL_FSM_GetDataBuffer(void);
-void ADXL_FSM_Init(uint8_t fifo_samples, fsm_error_callback error_cb, fsm_set_event_callback event_cb);
+void ADXL_FSM_Init(uint8_t fifo_samples, fsm_error_callback error_cb, fsm_set_event_callback event_cb, helper_external_callbacks *ext_callbacks);
 void ADXL_FSM_ProcessEvent(FsmEvent_t *user_event);
 ADXL_StreamStatus ADXL_FSM_GetStatus(void);
 

@@ -273,7 +273,7 @@ ADXL_status_t ADXL_RegInitAlternative(ADXL_Init_t *init_data)
 			CurrentState.DriverState = DRIVER_HALTED;
 			SimpleQueueInit(&ADXL_queue, adxl_queue_buffer, EVT_BUFFER_CAPACITY);
 			ret_val = ADXL_SUCCESS;
-			ADXL_FSM_Init(init_data->FifoSamples, ADXL_SetError, ADXL_SetEvent);
+			ADXL_FSM_Init(init_data->FifoSamples, ADXL_SetError, ADXL_SetEvent, init_data->helper_callbacks);
 		}
 		else
 		{
