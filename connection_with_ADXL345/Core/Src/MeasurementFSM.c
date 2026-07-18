@@ -13,7 +13,9 @@
 #include "simple_queue.h"
 #include <string.h>
 
-#define READOUT_NUM 100
+#define READOUT_NUM 100U
+
+#define MAX_DIAG_READOUT_LENGTH 150U
 
 typedef enum
 {
@@ -30,6 +32,7 @@ typedef struct
 	measurement_state_t current_state;
 	uint8_t number_of_fifo_samples;
 	MeasurementGetSizePhase_t get_size_phase;
+	char diag_readout[MAX_DIAG_READOUT_LENGTH];
 }MeasurementFSM_Data_t;
 
 
@@ -47,6 +50,7 @@ static FSM_ret MeasurementGetSize_StateHandler (fsm_context *ctx, FsmEvent_t *us
 static FSM_ret MeasurementError_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 static FSM_ret MeasurementStarting_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 static FSM_ret MeasurementStopping_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
+static FSM_ret MeasurementDiagReadout_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 void Measurement_SetEvent(MeasurementEvt_t evt);
 
 void MeasurementADXL_Started();
@@ -160,6 +164,40 @@ void Measurement_task()
 
 uint8_t data_in;
 
+static FSM_ret MeasurementDiagReadout_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
+{
+	FSM_ret ret_val = FSM_OK;
+	MeasurementEvt_t current_event = (MeasurementEvt_t)user_event->user_event;
+	MeasurementFSM_Data_t *context_data = (MeasurementFSM_Data_t*)ctx->user_data;
+
+	switch(current_event)
+	{
+		case FSM_INITIAL_EVENT:
+			if(ADXL_GetConfig(context_data->diag_readout, MAX_DIAG_READOUT_LENGTH) == ADXL_SUCCESS)
+			{
+				if(UART_Com_TransmitStringNonBlocking(context_data->diag_readout) != TRANSMIT_OK )
+				{
+					ret_val = FSM_ERROR;
+					context_data->last_error = MEAS_TX_FAILURE;
+				}
+			}
+			else
+			{
+				ret_val = FSM_ERROR;
+				context_data->last_error = MEAS_ADXL_FAILURE;
+			}
+			break;
+
+		case MEASUREMENT_EVT_TX_COMPLETED:
+			Fsm_StateTransition(ctx, MeasurementWaiting_StateHandler);
+			break;
+
+	}
+
+	return ret_val;
+}
+
+
 static FSM_ret MeasurementWaiting_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 {
 
@@ -185,13 +223,7 @@ static FSM_ret MeasurementWaiting_StateHandler (fsm_context *ctx, FsmEvent_t *us
 			}
 			else if(data_in == GET_CFG_SIGNAL) // use only for diagnostic purposes when stream measurements are stopped
 			{
-				char readout[150] = "";
-				ADXL_GetConfig(readout, 150);
-				UART_Com_TransmitString(readout);
-				if(UART_Com_ReceiveNonBlocking(&data_in, 1) != RECPETION_OK)
-				{
-					ret_val = FSM_ERROR;
-				}
+				Fsm_StateTransition(ctx, MeasurementDiagReadout_StateHandler);
 			}
 			break;
 
@@ -322,7 +354,7 @@ static FSM_ret MeasurementProcessing_StateHandler (fsm_context *ctx, FsmEvent_t 
 	{
 		case FSM_INITIAL_EVENT:
 			user_event->user_event = MEASUREMENT_EVT_CONFIG_SET;
-			user_event->user_data = (void*)(&(context_data->expected_size));
+			user_event->user_data = (void*)(&(context_data->expected_size)); // fallthrough
 		case MEASUREMENT_EVT_DATA_READY:
 		case MEASUREMENT_EVT_TX_COMPLETED:
 			if(MeasurementProcessingSubFsm_ProcessEvent(user_event) != FSM_OK)
