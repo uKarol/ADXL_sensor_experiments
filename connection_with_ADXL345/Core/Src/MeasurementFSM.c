@@ -8,11 +8,19 @@
 #include "MeasurementFSM.h"
 #include "ADXL_driver.h"
 #include "UART_Communication.h"
+#include "MEASUREMENT_SubFSM_Processing.h"
 #include "fsm.h"
 #include "simple_queue.h"
-
+#include <string.h>
 
 #define READOUT_NUM 100
+
+typedef enum
+{
+    GET_SIZE_IDLE,
+    GET_SIZE_WAIT_TX_COMPLETE,
+    GET_SIZE_WAIT_RX_COMPLETE
+} MeasurementGetSizePhase_t;
 
 typedef struct
 {
@@ -21,23 +29,14 @@ typedef struct
 	uint16_t expected_size;
 	measurement_state_t current_state;
 	uint8_t number_of_fifo_samples;
+	MeasurementGetSizePhase_t get_size_phase;
 }MeasurementFSM_Data_t;
 
-typedef uint16_t MeasurementEvt_t;
 
 MeasurementFSM_Data_t MeasurementData;
 
 #define EVT_BUFFER_CAPACITY (10U * sizeof(FsmEvent_t))
 
-enum
-{
-	MEASUREMENT_EVT_TX_COMPLETED = FSM_BASIC_EVENT_NUM,
-	MEASUREMENT_EVT_DATA_READY,
-	MEASUREMENT_EVT_RX_COMPLETED,
-	MEASUREMENT_EVT_STARTED,
-	MEASUREMENT_EVT_STOPPED,
-	MEASUREMENT_EVT_ADXL_ERROR_DETECTED,
-};
 
 uint8_t measurement_queue_buffer[EVT_BUFFER_CAPACITY];
 SimpleQueue_t MeasurementQueue;
@@ -124,6 +123,7 @@ measurement_error_t Measurement_Init(MeasurementInitStruct *init_data, measureme
 	if( ADXL_RegInitAlternative(&init_struct) == ADXL_SUCCESS )
 	{
 		MeasurementFsmData.number_of_fifo_samples = init_data->number_of_fifo_samples;
+		MeasurementProcessingSubFsm_Init(Measurement_SetEvent, init_data->number_of_fifo_samples);
 		MeasurementFSM_Init();
 		ret_val = MEAS_NO_ERROR;
 	}
@@ -172,6 +172,7 @@ static FSM_ret MeasurementWaiting_StateHandler (fsm_context *ctx, FsmEvent_t *us
 		case FSM_INITIAL_EVENT:
 			if(UART_Com_ReceiveNonBlocking(&data_in, 1) != RECPETION_OK)
 			{
+				context_data->last_error = MEAS_RX_FAILURE;
 				ret_val = FSM_ERROR;
 			}
 			break;
@@ -182,7 +183,7 @@ static FSM_ret MeasurementWaiting_StateHandler (fsm_context *ctx, FsmEvent_t *us
 				context_data->measure_ctr = 0;
 				Fsm_StateTransition(ctx, MeasurementGetSize_StateHandler);
 			}
-			else if(data_in == GET_CFG_SIGNAL)
+			else if(data_in == GET_CFG_SIGNAL) // use only for diagnostic purposes when stream measurements are stopped
 			{
 				char readout[150] = "";
 				ADXL_GetConfig(readout, 150);
@@ -195,11 +196,15 @@ static FSM_ret MeasurementWaiting_StateHandler (fsm_context *ctx, FsmEvent_t *us
 			break;
 
 		default:
+			context_data->last_error = MEAS_UNEXPECTED_EVENT;
 			ret_val = FSM_ERROR;
 			break;
 	}
 	return ret_val;
 }
+
+char helper_out_str[100];
+char helper_in_str[100];
 
 static FSM_ret MeasurementGetSize_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 {
@@ -210,19 +215,55 @@ static FSM_ret MeasurementGetSize_StateHandler (fsm_context *ctx, FsmEvent_t *us
 	switch(current_event)
 	{
 		case FSM_INITIAL_EVENT:
-			 uint16_t number_of_samples = 0;
-			 UART_Com_TransmitString("START");
-			 if( UART_Com_GetSize(&number_of_samples) == RECPETION_OK)
-			 {
-				 context_data->expected_size = number_of_samples;
-			 }
-			 else
-			 {
-				 context_data->expected_size = 1;
-			 }
+			strcpy(helper_out_str, "START");
+			if(UART_Com_TransmitStringNonBlocking(helper_out_str) == TRANSMIT_OK )
+			{
+				context_data->get_size_phase = GET_SIZE_WAIT_TX_COMPLETE;
+			}
+			else
+			{
+				context_data->last_error = MEAS_TX_FAILURE;
+				ret_val = FSM_ERROR;
+			}
+			break;
+		case MEASUREMENT_EVT_TX_COMPLETED:
 
-			 Fsm_StateTransition(ctx, MeasurementStarting_StateHandler);
-			 break;
+			if(context_data->get_size_phase != GET_SIZE_WAIT_TX_COMPLETE)
+			{
+				context_data->last_error = MEAS_UNEXPECTED_EVENT;
+				ret_val = FSM_ERROR;
+				break;
+			}
+
+			if(UART_Com_GetBytesNonBlocking(helper_in_str, 2) == RECPETION_OK )
+			{
+				context_data->get_size_phase = GET_SIZE_WAIT_RX_COMPLETE;
+			}
+			else
+			{
+				context_data->last_error = MEAS_RX_FAILURE;
+				ret_val = FSM_ERROR;
+			}
+			break;
+
+		case MEASUREMENT_EVT_RX_COMPLETED:
+			if(context_data->get_size_phase == GET_SIZE_WAIT_RX_COMPLETE)
+			{
+				uint16_t number_of_samples = ((uint16_t)helper_in_str[0])<<8 | helper_in_str[1];
+				context_data->expected_size = number_of_samples;
+				Fsm_StateTransition(ctx, MeasurementStarting_StateHandler);
+				context_data->get_size_phase = GET_SIZE_IDLE;
+			}
+			else
+			{
+				context_data->last_error = MEAS_UNEXPECTED_EVENT;
+				ret_val = FSM_ERROR;
+			}
+			break;
+		default:
+			context_data->last_error = MEAS_UNEXPECTED_EVENT;
+			ret_val = FSM_ERROR;
+			break;
 	}
 	return ret_val;
 }
@@ -240,6 +281,10 @@ static FSM_ret MeasurementStarting_StateHandler (fsm_context *ctx, FsmEvent_t *u
 			break;
 		case MEASUREMENT_EVT_STARTED:
 			Fsm_StateTransition(ctx, MeasurementProcessing_StateHandler);
+			break;
+		default:
+			context_data->last_error = MEAS_UNEXPECTED_EVENT;
+			ret_val = FSM_ERROR;
 			break;
 	}
 	return ret_val;
@@ -259,6 +304,10 @@ static FSM_ret MeasurementStopping_StateHandler (fsm_context *ctx, FsmEvent_t *u
 		case MEASUREMENT_EVT_STOPPED:
 			Fsm_StateTransition(ctx, MeasurementWaiting_StateHandler);
 			break;
+		default:
+			context_data->last_error = MEAS_UNEXPECTED_EVENT;
+			ret_val = FSM_ERROR;
+			break;
 	}
 	return ret_val;
 }
@@ -272,28 +321,26 @@ static FSM_ret MeasurementProcessing_StateHandler (fsm_context *ctx, FsmEvent_t 
 	switch(current_event)
 	{
 		case FSM_INITIAL_EVENT:
+			MeasurementProcessing_SetReadoutSize(context_data->expected_size);
 			break;
 
 		case MEASUREMENT_EVT_DATA_READY:
-			uint8_t *captured_data = ADXL_GetStreamedData();
-			if(UART_Com_TransmitString("OK\n") != TRANSMIT_OK )
+		case MEASUREMENT_EVT_TX_COMPLETED:
+			if(MeasurementProcessingSubFsm_ProcessEvent(user_event) != FSM_OK)
 			{
+				context_data->last_error = MeasurementProcessingSubFsm_GetError();
 				ret_val = FSM_ERROR;
-				break;
-			}
-			if( UART_Com_TransmitRawData(captured_data, (context_data->number_of_fifo_samples*ONE_SAMPLE_SIZE)) != TRANSMIT_OK )
-			{
-				ret_val = FSM_ERROR;
-				break;
-			}
-			ADXL_ReleaseDataBuffer();
-			context_data->measure_ctr++;
-			if(context_data->measure_ctr >= context_data->expected_size)
-			{
-				context_data->measure_ctr = 0;
-				Fsm_StateTransition(ctx, MeasurementStopping_StateHandler);
 			}
 			break;
+
+		case MEASUREMENT_EVT_READOUT_COMPLETED:
+			Fsm_StateTransition(ctx, MeasurementStopping_StateHandler);
+			break;
+		default:
+			context_data->last_error = MEAS_UNEXPECTED_EVENT;
+			ret_val = FSM_ERROR;
+			break;
+
 	}
 	return ret_val;
 }

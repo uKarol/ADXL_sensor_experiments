@@ -32,5 +32,8 @@ ReceptionStatus_t UART_Com_GetSize(uint16_t *size);
 TransmissionStatus_t UART_Com_TransmitString(char *str);
 TransmissionStatus_t UART_Com_TransmitRawData(uint8_t *data, uint32_t size);
 ReceptionStatus_t UART_Com_ReceiveNonBlocking(uint8_t *bytes, uint8_t size);
+TransmissionStatus_t UART_Com_TransmitStringNonBlocking(char *str);
+ReceptionStatus_t UART_Com_GetBytesNonBlocking(char *data_out, uint16_t size);
+TransmissionStatus_t UART_Com_TransmitRawDataNonBLocking(uint8_t *data, uint32_t size);
 
 #endif /* INC_UART_COMMUNICATION_H_ */

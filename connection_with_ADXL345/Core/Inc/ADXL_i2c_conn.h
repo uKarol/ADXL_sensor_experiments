@@ -39,4 +39,5 @@ ADXL_Errors_t ADXL_ReadRegBlocking(uint8_t reg_id, uint8_t *pValueOut);
 ADXL_Errors_t ADXL_WriteRegBlocking(uint8_t reg_id, uint8_t DataIn);
 ADXL_Errors_t ADXL_ReadMultipleRegsBlocking(uint8_t reg_id, uint8_t *pValueOut, uint8_t size);
 
+
 #endif /* INC_ADXL_I2C_CONN_H_ */

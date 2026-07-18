@@ -23,6 +23,16 @@ TransmissionStatus_t UART_Com_TransmitRawData(uint8_t *data, uint32_t size)
 	return ret_val;
 }
 
+TransmissionStatus_t UART_Com_TransmitRawDataNonBLocking(uint8_t *data, uint32_t size)
+{
+	TransmissionStatus_t ret_val = TRANSMIT_FAILURE;
+	if(HAL_UART_Transmit_IT(&hlpuart1, data, size) == HAL_OK)
+	{
+		ret_val = TRANSMIT_OK;
+	}
+	return ret_val;
+}
+
 TransmissionStatus_t UART_Com_TransmitData(int16_t Xdata, int16_t Ydata, int16_t Zdata)
 {
 	TransmissionStatus_t ret_val = TRANSMIT_FAILURE;
@@ -39,6 +49,16 @@ TransmissionStatus_t UART_Com_TransmitString(char *str)
 {
 	TransmissionStatus_t ret_val = TRANSMIT_FAILURE;
 	if( HAL_UART_Transmit(&hlpuart1, str, strlen(str), 100) == HAL_OK )
+	{
+		ret_val = TRANSMIT_OK;
+	}
+	return ret_val;
+}
+
+TransmissionStatus_t UART_Com_TransmitStringNonBlocking(char *str)
+{
+	TransmissionStatus_t ret_val = TRANSMIT_FAILURE;
+	if( HAL_UART_Transmit_IT(&hlpuart1, str, strlen(str)) == HAL_OK )
 	{
 		ret_val = TRANSMIT_OK;
 	}
@@ -71,6 +91,18 @@ uint8_t uart_read_byte(UART_HandleTypeDef *huart)
 {
 	while(!(huart->Instance->ISR & USART_ISR_RXNE));
 	return huart->Instance->RDR;
+}
+
+ReceptionStatus_t UART_Com_GetBytesNonBlocking(char *data_out, uint16_t size)
+{
+	ReceptionStatus_t ret_val = RECEPTION_FAILURE;
+
+	HAL_StatusTypeDef hal_ret = HAL_UART_Receive_IT(&hlpuart1, data_out, size);
+	if( hal_ret == HAL_OK )
+	{
+		ret_val = RECPETION_OK;
+	}
+	return ret_val;
 }
 
 ReceptionStatus_t UART_Com_GetSize(uint16_t *size)

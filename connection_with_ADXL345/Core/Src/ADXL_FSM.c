@@ -220,6 +220,13 @@ static FSM_ret StreamFlushing_StateHandler (fsm_context *ctx, FsmEvent_t *user_e
 			}
 			break;
 		case ADXL_EVT_FIFO_CLEARED:
+			if(context_data->ext_callbacks != NULL)
+			{
+				if(context_data->ext_callbacks->adxl_started_callback != NULL)
+				{
+					context_data->ext_callbacks->adxl_started_callback();
+				}
+			}
 			Fsm_StateTransition(ctx,StreamWaiting_StateHandler);
 			ret_val = FSM_OK;
 			break;
@@ -247,13 +254,6 @@ FSM_ret StreamWaiting_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 	switch(current_event)
 	{
 		case FSM_INITIAL_EVENT:
-			if(context_data->ext_callbacks != NULL)
-			{
-				if(context_data->ext_callbacks->adxl_started_callback != NULL)
-				{
-					context_data->ext_callbacks->adxl_started_callback();
-				}
-			}
 			context_data->current_state = STREAM_WAITING;
 			break;
 		case ADXL_EVT_EXTI_IRQ: // fallthrough
