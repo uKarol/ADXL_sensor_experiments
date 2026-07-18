@@ -321,9 +321,8 @@ static FSM_ret MeasurementProcessing_StateHandler (fsm_context *ctx, FsmEvent_t 
 	switch(current_event)
 	{
 		case FSM_INITIAL_EVENT:
-			MeasurementProcessing_SetReadoutSize(context_data->expected_size);
-			break;
-
+			user_event->user_event = MEASUREMENT_EVT_CONFIG_SET;
+			user_event->user_data = (void*)(&(context_data->expected_size));
 		case MEASUREMENT_EVT_DATA_READY:
 		case MEASUREMENT_EVT_TX_COMPLETED:
 			if(MeasurementProcessingSubFsm_ProcessEvent(user_event) != FSM_OK)

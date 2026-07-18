@@ -14,7 +14,6 @@
 typedef void(*measurement_set_event_callback)(MeasurementEvt_t evt); 
 
 void MeasurementProcessingSubFsm_Reset();
-void MeasurementProcessing_SetReadoutSize(uint16_t exp_size);
 measurement_error_t MeasurementProcessingSubFsm_GetError();
 FSM_ret MeasurementProcessingSubFsm_ProcessEvent(FsmEvent_t *user_event);
 void MeasurementProcessingSubFsm_Init(measurement_set_event_callback event_cb, uint8_t number_of_fifo_samples);

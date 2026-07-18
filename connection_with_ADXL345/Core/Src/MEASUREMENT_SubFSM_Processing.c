@@ -27,11 +27,6 @@ typedef struct
 static MeasurementProcessingCtxData_t MeasurementProcessingFsmData;
 static fsm_context MeasurementProcessingFsmContext;
 
-void MeasurementProcessing_SetReadoutSize(uint16_t exp_size)
-{
-	MeasurementProcessingFsmData.expected_size = exp_size;
-}
-
 static FSM_ret MeasurementProcessingIdle_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 static FSM_ret MeasurementProcessingHeaderSending_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 static FSM_ret MeasurementProcessingDataSending_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
@@ -74,10 +69,15 @@ static FSM_ret MeasurementProcessingIdle_StateHandler (fsm_context *ctx, FsmEven
 	FSM_ret ret_val = FSM_OK;
 	MeasurementEvt_t current_event = (MeasurementEvt_t)user_event->user_event;
 	MeasurementProcessingCtxData_t *context_data = (MeasurementProcessingCtxData_t*)ctx->user_data;
+	uint16_t *event_data = (uint16_t*)(user_event->user_data);
 
 	switch(current_event)
 	{ 
 		case FSM_INITIAL_EVENT:
+		break;
+
+		case MEASUREMENT_EVT_CONFIG_SET:
+			context_data->expected_size = *event_data;
 		break;
 
 		case MEASUREMENT_EVT_DATA_READY:
