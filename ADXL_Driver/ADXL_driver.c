@@ -5,15 +5,19 @@
  *      Author: Karol
  */
 
+#include "adxl_user_cfg.h"
+
+#ifndef USE_OS
+
 #include "fsm.h"
 #include "i2c.h"
 #include "ADXL_driver.h"
 #include "ADXL_defs.h"
-#include "simple_queue.h"
 #include "stdio.h"
 #include "stdbool.h"
 #include "ADXL_FSM.h"
 #include "ADXL_i2c_conn.h"
+#include "simple_queue.h"
 
 #define DEV_ID_REG 0U
 #define DEV_ID 0xE5
@@ -367,3 +371,5 @@ void ADXL_SetEvent(ADXL_FSM_Events evt)
 	FsmEvent_t user_event = {evt, NULL};
 	SimpleQueuePut(&ADXL_queue, (void*)(&user_event), sizeof(user_event));
 }
+
+#endif /* USE_OS */

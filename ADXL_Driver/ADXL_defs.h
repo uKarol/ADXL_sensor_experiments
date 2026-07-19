@@ -1,14 +1,55 @@
 /*
- * ADXL_driver.h
+ * ADXL_defs.h
  *
  *  Created on: Jun 9, 2026
  *      Author: Karol
  */
 
-#ifndef INC_ADXL_DRIVER_H_
-#define INC_ADXL_DRIVER_H_
+#ifndef INC_ADXL_DEFS_H_
+#define INC_ADXL_DEFS_H_
 
-#include <stdint.h>
+#define ADEXL_ID (0x53U<<1U)
+
+#define DATAX0_REG 0x32U
+#define DATAX1_REG 0x33U
+#define DATAY0_REG 0x34U
+#define DATAY1_REG 0x35U
+#define DATAZ0_REG 0x36U
+#define DATAZ1_REG 0x37U
+#define OFSX_REG 0x1E
+#define OFSY_REG 0x1F
+#define OFSZ_REG 0x20
+#define DATA_FORMAT_REG 0x31U
+#define BW_RATE_REG 0x2CU
+
+#define INT_ENABLE_REG 0x2E
+#define INT_MAP_REG 0x2F
+#define INT_SOURCE 0x30
+
+#define FIFO_CTL 0x38
+#define FIFO_STATUS 0x39
+
+#define FIFO_CTL_SAMPLES_MASK 0x1F
+// adxl registers
+
+#define POWER_CTL 0x2DU
+#define FIFO_ENTRIES_BIT_MSK 0x3FU
+// adxl bits
+#define POWER_CTL_MEASURE (1U<<3U)
+
+#define ADXL_INT_ENABLE_WATERMARK (1U<<1)
+#define ADXL_INT_ENABLE_OVERRUN (1U<<0)
+
+#define ADXL_INT_SOURCE_WATERMARK (1U<<1)
+#define ADXL_INT_SOURCE_OVERRUN (1U<<0)
+
+#define ADXL_FIFO_CTL_STREAM (1U<<7)
+#define ADFL_FIFO_16_SAMPLES (1U<<4)
+#define ADFL_FIFO_8_SAMPLES (1U<<3)
+
+#define MAX_NUMBER_OF_SAMPLES 32U // number of samples per watermark
+#define MAX_READOUT_SIZE (ONE_SAMPLE_SIZE * MAX_NUMBER_OF_SAMPLES)
+
 
 typedef enum
 {
@@ -68,25 +109,4 @@ typedef struct
 
 #define ONE_SAMPLE_SIZE 6U // sample size in bytes
 
-ADXL_status_t ADXL_init_default();
-ADXL_status_t ADXL_ReadData(int16_t *Xdata, int16_t *Ydata, int16_t *Zdata);
-ADXL_status_t ADXL_GetConfig(char *readout, uint16_t max_size );
-void ADXL_INT1InterruptHandler(void);
-void ADXL_FIFO_Check();
-ADXL_status_t ADXL_RegInitAlternative();
-ADXL_StreamStatus ADXL_GetStreamStatus(void);
-void ADXL_I2CTxComplete(void);
-uint8_t* ADXL_GetStreamedData(void);
-void ADXL_ReleaseDataBuffer(void);
-void ADXL_DMAStreamComplete(void);
-
-ADXL_Errors_t ADXL_GetLastError(void);
-ADXL_status_t ADXL_ResetDriver(void);
-
-ADXL_status_t ADXL_StartStreamMeasurements(void);
-ADXL_status_t ADXL_StopStreamMeasurements(void);
-
-void ADXL_task();
-
-
-#endif /* INC_ADXL_DRIVER_H_ */
+#endif /* INC_ADXL_DEFS_H_ */
