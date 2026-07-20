@@ -25,8 +25,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "Measurement_Task.h"
-#include "ADXL345_task.h"
+#include "MeasurementFSM.h".h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -58,8 +57,7 @@ const osThreadAttr_t defaultTask_attributes = {
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
-TaskHandle_t measurement_task_handle;
-TaskHandle_t adxl_task_handle;
+
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
@@ -135,14 +133,13 @@ void MX_FREERTOS_Init(void) {
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
+  MeasurementInitStruct initdata = {16};
+
+  Measurement_Init(&initdata, NULL);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
 
-  BaseType_t result;
-
-	result = xTaskCreate(ADXL_Task, "task_ADXL", ADXL_STACK_SIZE, NULL, 4, &adxl_task_handle);
-
-	result = xTaskCreate(Measurement_Task, "task_Measurement", MEASUREMENT_STACK_SIZE, NULL, 4, &measurement_task_handle);
 
   /* USER CODE END RTOS_THREADS */
 

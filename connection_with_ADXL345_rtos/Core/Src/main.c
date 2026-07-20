@@ -26,7 +26,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "stdio.h"
+#include "ADXL_driver.h"
+#include "ADXL_i2c_conn.h"
+#include "MeasurementFSM.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -47,7 +50,42 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  if (GPIO_Pin == B1_Pin) {
 
+  }
+  else if(GPIO_Pin == INT0_Pin)
+  {
+	  ADXL_INT1InterruptHandler();
+  }
+}
+
+void HAL_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+	if(hi2c == &hi2c1)
+	{
+		ADXL_I2CTxComplete();
+	}
+}
+
+void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+	if(hi2c == &hi2c1)
+	{
+		ADXL_I2CRxComplete();
+	}
+}
+
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+	MeasurementTransmitCompleted();
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	MeasurementRxCompleted();
+}
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
