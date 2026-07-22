@@ -129,15 +129,27 @@ static FSM_ret StreamUnexpectedIRQ_CheckingIntStatus(fsm_context *ctx, FsmEvent_
 		case ADXL_EVT_I2C_RX_COMPLETED:
 			if(data_out & ADXL_INT_SOURCE_OVERRUN)
 			{
-				context_data->evt_callback(ADXL_EVT_FIFO_OVERRUN);
+				if( context_data->evt_callback(ADXL_EVT_FIFO_OVERRUN) != ADXL_SUCCESS)
+				{
+					ret_val = FSM_ERROR;
+					context_data->last_error = ADXL_ERR_QUEUE_FAILURE;
+				}
 			}
 			else if(data_out & ADXL_INT_SOURCE_WATERMARK)
 			{
-				context_data->evt_callback(ADXL_EVT_UNEXPCETED_WATERMARK);
+				if(context_data->evt_callback(ADXL_EVT_UNEXPCETED_WATERMARK) != ADXL_SUCCESS)
+				{
+					ret_val = FSM_ERROR;
+					context_data->last_error = ADXL_ERR_QUEUE_FAILURE;
+				}
 			}
 			else
 			{
-				context_data->evt_callback(ADXL_EVT_UNKNOWN_IRQ);
+				if(context_data->evt_callback(ADXL_EVT_UNKNOWN_IRQ) != ADXL_SUCCESS)
+				{
+					ret_val = FSM_ERROR;
+					context_data->last_error = ADXL_ERR_QUEUE_FAILURE;
+				}
 			}
 			Fsm_StateTransition(ctx, StreamUnexpectedIRQ_EntryStateHandler);
 			break;

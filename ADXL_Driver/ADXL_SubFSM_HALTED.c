@@ -136,8 +136,15 @@ static FSM_ret StreamHalted_Waiting (fsm_context *ctx, FsmEvent_t *user_event)
 		case FSM_INITIAL_EVENT:
 			break;
 		case ADXL_EVT_TIMEOUT:
-			context_data->evt_callback(ADXL_EVT_SENSOR_ENABLED);
-			Fsm_StateTransition(ctx, StreamHalted_IdleStateHandler);
+			if(context_data->evt_callback(ADXL_EVT_SENSOR_ENABLED) == ADXL_SUCCESS )
+			{
+				Fsm_StateTransition(ctx, StreamHalted_IdleStateHandler);
+			}
+			else
+			{
+				ret_val = FSM_ERROR;
+				context_data->last_error = ADXL_ERR_QUEUE_FAILURE;
+			}
 			break;
 		default:
 			ret_val = FSM_ERROR;

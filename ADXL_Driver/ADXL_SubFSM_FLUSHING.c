@@ -104,8 +104,15 @@ static FSM_ret StreamFlushingCheckFifo_StateHandler (fsm_context *ctx, FsmEvent_
 			context_data->expected_size = (context_data->dma_out_data & FIFO_ENTRIES_BIT_MSK);
 			if(context_data->expected_size == 0)
 			{
-				context_data->evt_callback(ADXL_EVT_FIFO_CLEARED);
-				Fsm_StateTransition(ctx, StreamFlushingIdle_StateHandler);				
+				if(context_data->evt_callback(ADXL_EVT_FIFO_CLEARED) == ADXL_SUCCESS)
+				{
+					Fsm_StateTransition(ctx, StreamFlushingIdle_StateHandler);		
+				}
+				else
+				{
+					ret_val = FSM_ERROR;
+					context_data->last_error = ADXL_ERR_QUEUE_FAILURE;
+				}		
 			}
 			else
 			{
@@ -138,8 +145,15 @@ static FSM_ret StreamFlushingDataReadout_StateHandler (fsm_context *ctx, FsmEven
 
 			if(context_data->readout_num == context_data->expected_size)
 			{
-				context_data->evt_callback(ADXL_EVT_FIFO_CLEARED);
-				Fsm_StateTransition(ctx, StreamFlushingIdle_StateHandler);
+				if(context_data->evt_callback(ADXL_EVT_FIFO_CLEARED) == ADXL_SUCCESS)
+				{
+					Fsm_StateTransition(ctx, StreamFlushingIdle_StateHandler);
+				}
+				else
+				{
+					ret_val = FSM_ERROR;
+					context_data->last_error = ADXL_ERR_QUEUE_FAILURE;
+				}
 			}
 			else
 			{

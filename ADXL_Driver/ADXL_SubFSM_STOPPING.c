@@ -126,8 +126,15 @@ static FSM_ret StreamStopping_ResettingPowerCTL(fsm_context *ctx, FsmEvent_t *us
 			}
 			break;
 		case ADXL_EVT_I2C_TX_COMPLETED:
-			context_data->evt_callback(ADXL_EVT_STREAM_HALTED);
-			Fsm_StateTransition(ctx, StreamStopping_EntryStateHandler);
+			if(context_data->evt_callback(ADXL_EVT_STREAM_HALTED) == ADXL_SUCCESS)
+			{
+				Fsm_StateTransition(ctx, StreamStopping_EntryStateHandler);
+			}
+			else
+			{
+				ret_val = FSM_ERROR;
+				context_data->last_error = ADXL_ERR_QUEUE_FAILURE;
+			}
 			break;
 		default:
 			ret_val = FSM_ERROR;

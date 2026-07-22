@@ -98,8 +98,15 @@ static FSM_ret StreamWaiting_CheckIntStatusStateHandler (fsm_context *ctx, FsmEv
 			/* code */
 			if(context_data->dma_out_data & ADXL_INT_ENABLE_OVERRUN)
 			{
-				context_data->evt_callback(ADXL_EVT_FIFO_OVERRUN);
-				Fsm_StateTransition(ctx, StreamWaiting_IdleStateHandler);
+				if(context_data->evt_callback(ADXL_EVT_FIFO_OVERRUN) == ADXL_SUCCESS)
+				{
+					Fsm_StateTransition(ctx, StreamWaiting_IdleStateHandler);
+				}
+				else
+				{
+					ret_val = FSM_ERROR;
+					context_data->last_error = ADXL_ERR_QUEUE_FAILURE;
+				}
 
 			}
 			else if(context_data->dma_out_data & ADXL_INT_ENABLE_WATERMARK)
@@ -140,8 +147,15 @@ static FSM_ret StreamWaiting_CheckFifoStateHandler (fsm_context *ctx, FsmEvent_t
 			/* code */
 			if((context_data->dma_out_data & FIFO_ENTRIES_BIT_MSK) >= context_data->expected_size)
 			{
-				context_data->evt_callback(ADXL_EVT_FIFO_READY);
-				Fsm_StateTransition(ctx, StreamWaiting_IdleStateHandler);
+				if(context_data->evt_callback(ADXL_EVT_FIFO_READY) == ADXL_SUCCESS )
+				{
+					Fsm_StateTransition(ctx, StreamWaiting_IdleStateHandler);
+				}
+				else
+				{
+					ret_val = FSM_ERROR;
+					context_data->last_error = ADXL_ERR_QUEUE_FAILURE;
+				}
 			}
 			break;
 		default:
