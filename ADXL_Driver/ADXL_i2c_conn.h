@@ -8,6 +8,8 @@
 #ifndef INC_ADXL_I2C_CONN_H_
 #define INC_ADXL_I2C_CONN_H_
 
+#include "ADXL_defs.h"
+
 typedef enum
 {
 	ADXL_OP_NO_OPERATION,

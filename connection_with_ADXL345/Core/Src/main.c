@@ -27,7 +27,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stdio.h"
-#include "ADXL_driver.h"
+#include "ADXL_driver_interface.h"
 #include "ADXL_i2c_conn.h"
 #include "MeasurementFSM.h"
 /* USER CODE END Includes */

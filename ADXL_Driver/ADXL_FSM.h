@@ -8,7 +8,7 @@
 #ifndef INC_ADXL_FSM_H_
 #define INC_ADXL_FSM_H_
 
-#include "ADXL_driver.h"
+#include "ADXL_driver_interface.h"
 #include "fsm.h"
 
 enum
@@ -41,7 +41,7 @@ enum
 typedef uint16_t ADXL_FSM_Events;
 
 typedef void (*fsm_error_callback)(ADXL_Errors_t CurrentError);
-typedef void (*fsm_set_event_callback)(ADXL_FSM_Events evt);
+typedef ADXL_status_t (*fsm_set_event_callback)(ADXL_FSM_Events evt);
 
 #define EVT_BUFFER_CAPACITY (10U * sizeof(FsmEvent_t))
 

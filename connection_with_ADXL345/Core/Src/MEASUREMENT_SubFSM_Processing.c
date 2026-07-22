@@ -8,7 +8,7 @@
 
 #include "MeasurementFSM.h"
 #include "MEASUREMENT_SubFSM_Processing.h"
-#include "ADXL_driver.h"
+#include "ADXL_driver_interface.h"
 #include "UART_Communication.h"
 #include "fsm.h"
 

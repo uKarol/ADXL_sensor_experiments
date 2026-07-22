@@ -87,6 +87,10 @@ static void ADXL_FSM_ErrorCallback()
 	Fsm_StateTransition(&StreamFsmContext, StreamError_StateHandler);
 }
 
+/**
+ * @breif function called by timer when time period elapses
+ *
+ */
 void ADXL_TimeoutEvent()
 {
 	StreamFsmData.evt_callback(ADXL_EVT_TIMEOUT);

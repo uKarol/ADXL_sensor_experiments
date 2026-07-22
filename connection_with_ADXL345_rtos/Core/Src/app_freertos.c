@@ -25,7 +25,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "MeasurementFSM.h".h"
+#include "MeasurementFSM.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/

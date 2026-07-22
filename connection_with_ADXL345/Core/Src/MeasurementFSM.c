@@ -6,7 +6,7 @@
  */
 
 #include "MeasurementFSM.h"
-#include "ADXL_driver.h"
+#include "ADXL_driver_interface.h"
 #include "UART_Communication.h"
 #include "MEASUREMENT_SubFSM_Processing.h"
 #include "fsm.h"
@@ -124,7 +124,7 @@ measurement_error_t Measurement_Init(MeasurementInitStruct *init_data, measureme
 
 	ADXL_Init_t init_struct = {init_data->number_of_fifo_samples, &adxl_callbacks};
 
-	if( ADXL_RegInitAlternative(&init_struct) == ADXL_SUCCESS )
+	if( ADXL_Driver_Init(&init_struct) == ADXL_SUCCESS )
 	{
 		MeasurementFsmData.number_of_fifo_samples = init_data->number_of_fifo_samples;
 		MeasurementProcessingSubFsm_Init(Measurement_SetEvent, init_data->number_of_fifo_samples);

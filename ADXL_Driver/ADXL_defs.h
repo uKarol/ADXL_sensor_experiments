@@ -8,6 +8,8 @@
 #ifndef INC_ADXL_DEFS_H_
 #define INC_ADXL_DEFS_H_
 
+#include <stdint.h>
+
 #define ADEXL_ID (0x53U<<1U)
 
 #define DATAX0_REG 0x32U
@@ -66,8 +68,9 @@ typedef enum
 	ADXL_ERR_COMMUNICATION_LOST,	// not recoverable, reinit required
 	ADXL_ERR_DMA_PROBLEM,			// not recoverable, reinit required
 	ADXL_ERR_UNEXPECTED_BEHAVIOUR,	// not recoverable, reinit required
-	ADXL_ERR_UNEXPECTED_REG_VAL,		// not recoverable, reinit required
-	ADXL_ERR_UNEXPECTED_WATERMARK
+	ADXL_ERR_UNEXPECTED_REG_VAL,	// not recoverable, reinit required
+	ADXL_ERR_UNEXPECTED_WATERMARK,	// recoverable
+	ADXL_ERR_QUEUE_FAILURE,			// not recoverable
 }ADXL_Errors_t;
 
 typedef enum
