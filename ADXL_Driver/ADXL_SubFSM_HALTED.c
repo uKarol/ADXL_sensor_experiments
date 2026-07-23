@@ -6,7 +6,6 @@
  */
 
 #include "ADXL_SubFSM_HALTED.h"
-#include "ADXL_driver.h"
 #include "ADXL_FSM.h"
 #include "ADXL_defs.h"
 #include "fsm.h"

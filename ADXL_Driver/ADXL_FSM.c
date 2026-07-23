@@ -6,7 +6,6 @@
  */
 
 #include "fsm.h"
-#include "ADXL_driver.h"
 #include "ADXL_FSM.h"
 #include "ADXL_i2c_conn.h"
 #include "ADXL_defs.h"

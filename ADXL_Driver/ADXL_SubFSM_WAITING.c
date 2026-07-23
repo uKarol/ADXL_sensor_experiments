@@ -5,7 +5,6 @@
  *      Author: Karol
  */
 #include "ADXL_SubFSM_WAITING.h"
-#include "ADXL_driver.h"
 #include "ADXL_FSM.h"
 #include "ADXL_defs.h"
 #include "ADXL_i2c_conn.h"

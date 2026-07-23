@@ -47,3 +47,8 @@ void EvtTimerStart(uint8_t period)
 	xTimerStart(internal_tmr, 0);
 }
 
+void EvtTimerStop()
+{
+	period_ctr = 0;
+	xTimerStop(internal_tmr, 0);
+}

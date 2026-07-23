@@ -11,7 +11,6 @@
 #include "fsm.h"
 #include "ADXL_FSM.h"
 #include "ADXL_defs.h"
-#include "ADXL_driver.h"
 
 void Stream_WaitingSubFsmInit(fsm_set_event_callback event_cb, uint8_t fifo_samples);
 FSM_ret ADXL_FSMWaiting_ProcessEvent(FsmEvent_t *user_event);

@@ -5,7 +5,6 @@
  *      Author: Karol
  */
 
-#include "ADXL_driver.h"
 #include "i2c.h"
 #include "ADXL_defs.h"
 #include "ADXL_i2c_conn.h"

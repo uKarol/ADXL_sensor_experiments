@@ -35,3 +35,9 @@ void EvtTimerStart(uint8_t period)
 	period_ctr = 0;
 	HAL_TIM_Base_Start_IT(&htim6);
 }
+
+void EvtTimerStop()
+{
+	period_ctr = 0;
+	HAL_TIM_Base_Stop_IT(&htim6);
+}

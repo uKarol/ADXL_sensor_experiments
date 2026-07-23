@@ -11,7 +11,6 @@
 #include "fsm.h"
 #include "ADXL_FSM.h"
 #include "ADXL_defs.h"
-#include "ADXL_driver.h"
 
 void Stream_StoppingReset();
 void Stream_StoppingSubFsmInit(fsm_set_event_callback event_cb);

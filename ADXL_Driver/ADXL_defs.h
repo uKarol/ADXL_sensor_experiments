@@ -52,6 +52,7 @@
 #define MAX_NUMBER_OF_SAMPLES 32U // number of samples per watermark
 #define MAX_READOUT_SIZE (ONE_SAMPLE_SIZE * MAX_NUMBER_OF_SAMPLES)
 
+#define DEFAULT_COMM_TIMEOUT 100 // in milliseconds
 
 typedef enum
 {
@@ -71,6 +72,7 @@ typedef enum
 	ADXL_ERR_UNEXPECTED_REG_VAL,	// not recoverable, reinit required
 	ADXL_ERR_UNEXPECTED_WATERMARK,	// recoverable
 	ADXL_ERR_QUEUE_FAILURE,			// not recoverable
+	ADXL_ERR_UNEXPECTED_TIMEOUT
 }ADXL_Errors_t;
 
 typedef enum
