@@ -101,14 +101,16 @@ void ADXL_FSM_Init(uint8_t fifo_samples, fsm_error_callback error_cb, fsm_set_ev
 	StreamFsmData.error_callback = error_cb;
 	StreamFsmData.fifo_samples_num = fifo_samples;
 
+	uint8_t tmr_id = EvtTimerInit(ADXL_TimeoutEvent);
+
 	Stream_WaitingSubFsmInit(event_cb, fifo_samples);
 	Stream_FlushingSubFsmInit(event_cb);
-	Stream_HaltedSubFsmInit(event_cb);
+	Stream_HaltedSubFsmInit(event_cb, tmr_id);
 	Stream_StoppingSubFsmInit(event_cb);
 	Stream_UnexpectedIRQSubFsmInit(event_cb);
 	StreamFsmData.ext_callbacks = ext_callbacks;
 	Fsm_Init(&StreamFsmContext, StreamHalted_StateHandler , &StreamFsmData, ADXL_FSM_ErrorCallback);
-	EvtTimerInit(ADXL_TimeoutEvent);
+
 }
 
 static FSM_ret StreamStopping_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)

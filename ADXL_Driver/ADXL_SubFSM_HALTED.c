@@ -18,6 +18,7 @@ typedef struct
 	uint8_t dma_out_data;
 	uint8_t data_in;
 	fsm_set_event_callback evt_callback;
+	uint8_t evt_tmr_id;
 }StreamHaltedCtxData_t;
 
 static StreamHaltedCtxData_t StreamHaltedFsmData;
@@ -38,8 +39,9 @@ static void FlushingSubFsmErrorCallback()
 	Fsm_StateTransition(&StreamHaltedFsmContext, StreamHalted_IdleStateHandler);
 }
 
-void Stream_HaltedSubFsmInit(fsm_set_event_callback event_cb)
+void Stream_HaltedSubFsmInit(fsm_set_event_callback event_cb, uint8_t evt_tmr_id)
 {
+	StreamHaltedFsmData.evt_tmr_id = evt_tmr_id;
 	StreamHaltedFsmData.evt_callback = event_cb;
 	Fsm_Init(&StreamHaltedFsmContext, StreamHalted_IdleStateHandler , &StreamHaltedFsmData, FlushingSubFsmErrorCallback);
 }
@@ -106,7 +108,7 @@ static FSM_ret StreamHalted_SettingPowerCTL (fsm_context *ctx, FsmEvent_t *user_
 		case ADXL_EVT_I2C_RX_COMPLETED:
 			if(context_data->dma_out_data == POWER_CTL_MEASURE)
 			{
-				EvtTimerStart(100);
+				EvtTimerStart(context_data->evt_tmr_id, 100);
 				Fsm_StateTransition(ctx, StreamHalted_Waiting);
 				break;
 			}

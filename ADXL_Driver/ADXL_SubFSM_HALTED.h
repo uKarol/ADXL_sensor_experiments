@@ -14,7 +14,7 @@
 #include "ADXL_defs.h"
 
 void Stream_HaltedReset();
-void Stream_HaltedSubFsmInit(fsm_set_event_callback event_cb);
+void Stream_HaltedSubFsmInit(fsm_set_event_callback event_cb, uint8_t evt_tmr_id);
 FSM_ret ADXL_FSMHalted_ProcessEvent(FsmEvent_t *user_event);
 ADXL_Errors_t ADXL_FSMHalted_GetError();
 
