@@ -190,6 +190,9 @@ void ADXL_ConnCallback(ADXL_ConnEvt evt)
 		case UNEXPECTED_EVT:
 			evt_ret_val = ADXL_SetEvent(ADXL_EVT_ERROR_OCCURED);
 			break;
+		case COMM_TIMEOUT:
+			evt_ret_val = ADXL_SetEvent(ADXL_EVT_COMM_TIMEOUT);
+			break;
 	}
 	if(evt_ret_val != ADXL_SUCCESS)
 	{

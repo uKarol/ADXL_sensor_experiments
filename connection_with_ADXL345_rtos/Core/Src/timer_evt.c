@@ -11,6 +11,8 @@
 
 #include "FreeRTOS.h"
 #include "timers.h"
+#include "stdbool.h"
+#include "cmsis_gcc.h"
 
 #define MAX_TMR_NUM 10
 
@@ -83,12 +85,31 @@ void EvtTimerStart(uint8_t timer_id, uint8_t period)
 	}
 }
 
+static bool IsIsr()
+{
+	if(__get_IPSR() == 0)
+	{
+		return false;
+	}
+	else
+	{
+		return true;
+	}
+}
+
 void EvtTimerStop(uint8_t timer_id)
 {
 	if(timer_id < MAX_TMR_NUM)
 	{
 		internal_timer* current_tmr = &(internal_timers[timer_id]);
 		current_tmr->period_ctr = 0;
-		xTimerStop(current_tmr->internal_ostmr, 0);
+		if(IsIsr())
+		{
+			xTimerStopFromISR(current_tmr->internal_ostmr, 0);
+		}
+		else
+		{
+			xTimerStop(current_tmr->internal_ostmr, 0);
+		}
 	}
 }

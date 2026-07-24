@@ -8,19 +8,25 @@
 #include "i2c.h"
 #include "ADXL_defs.h"
 #include "ADXL_i2c_conn.h"
-
+#include "timer_evt.h"
 
 #define BLOCKING_DEF_TIMEOUT 100U
+#define COMM_OPERATION_TIMEOUT 100U
 
 static volatile ADXL_Operation_t Current_operation;
 
 
 conn_evt_callback evt_callback;
+uint8_t comm_evt_tmr_id;
 
+void ADXL_CommTimeout(void)
+{
+	evt_callback(COMM_TIMEOUT);
+}
 
 void ADXL_I2CTxComplete(void)
 {
-
+	EvtTimerStop(comm_evt_tmr_id);
 	if(Current_operation == ADXL_WRITE_SINGLE_REG)
 	{
 		Current_operation = ADXL_OP_NO_OPERATION;
@@ -35,6 +41,7 @@ void ADXL_I2CTxComplete(void)
 
 void ADXL_I2CRxComplete(void)
 {
+	EvtTimerStop(comm_evt_tmr_id);
 	switch(Current_operation)
 	{
 		case ADXL_READ_SINGLE_REG:
@@ -56,6 +63,7 @@ void ADXLConn_Init(conn_evt_callback callback)
 {
 	evt_callback = callback;
 	Current_operation = ADXL_OP_NO_OPERATION;
+	comm_evt_tmr_id = EvtTimerInit(ADXL_CommTimeout);
 }
 
 
@@ -71,6 +79,7 @@ ADXL_Errors_t ADXL_ReadMultipleRegsNonBlocking(uint8_t reg_id, uint8_t *pValueOu
 	{
 		if(HAL_I2C_Mem_Read_DMA(&hi2c1, ADEXL_ID, reg_id, 1, pValueOut, size) == HAL_OK )
 		{
+			EvtTimerStart(comm_evt_tmr_id, COMM_OPERATION_TIMEOUT);
 			ret_val = ADXL_ERR_NO_ERROR;
 			Current_operation = ADXL_READ_MULTIPLE_REGS;
 		}
@@ -85,6 +94,7 @@ ADXL_Errors_t ADXL_ReadRegNonBlocking(uint8_t reg_id, uint8_t *pValueOut)
 	{
 		if(HAL_I2C_Mem_Read_DMA(&hi2c1, ADEXL_ID, reg_id, 1, pValueOut, 1) == HAL_OK )
 		{
+			EvtTimerStart(comm_evt_tmr_id, COMM_OPERATION_TIMEOUT);
 			ret_val = ADXL_ERR_NO_ERROR;
 			Current_operation = ADXL_READ_SINGLE_REG;
 		}
@@ -99,6 +109,7 @@ ADXL_Errors_t ADXL_WriteRegNonBlocking(uint8_t reg_id, uint8_t *DataIn)
 	{
 		if(HAL_I2C_Mem_Write_IT(&hi2c1, ADEXL_ID, reg_id, 1, DataIn, 1) == HAL_OK)
 		{
+			EvtTimerStart(comm_evt_tmr_id, COMM_OPERATION_TIMEOUT);
 			ret_val = ADXL_ERR_NO_ERROR;
 			Current_operation = ADXL_WRITE_SINGLE_REG;
 		}
