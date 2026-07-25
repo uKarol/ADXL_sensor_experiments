@@ -278,10 +278,12 @@ ADXL_status_t ADXL_Driver_Init(ADXL_Init_t *init_data)
     ADXL_status_t ret_val = ADXL_FAILURE;
     if(ADXL_InitLowLevel(init_data) == ADXL_SUCCESS)
     {
-        ADXL_FSM_Init(init_data->FifoSamples, ADXL_SetError, ADXL_SetEvent, init_data->helper_callbacks);
-        if(ADXL_Task_Init() == ADXL_SUCCESS)
+        if( ADXL_FSM_Init(init_data->FifoSamples, ADXL_SetError, ADXL_SetEvent, init_data->helper_callbacks) == ADXL_SUCCESS )
         {
-            ret_val = ADXL_SUCCESS;
+			if(ADXL_Task_Init() == ADXL_SUCCESS)
+			{
+				ret_val = ADXL_SUCCESS;
+			}
         }
     }
     return ret_val;

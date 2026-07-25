@@ -11,6 +11,8 @@
 #include "tim.h"
 #include "stdint.h"
 
+#define EVT_TIMER_INVALID_ID 0xFFU
+
 typedef void (*timer_cb)(void);
 
 uint8_t EvtTimerInit(timer_cb callback);

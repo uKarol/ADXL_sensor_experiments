@@ -80,7 +80,7 @@ ADXL_status_t ADXL_SetEvent(ADXL_FSM_Events evt)
 	FsmEvent_t user_event = {evt, NULL};
 	if(IsIsr())
 	{
-		BaseType_t xHigherPriorityTaskWoken;
+		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 		if( xQueueSendFromISR(ADXL_EvtQueue, &user_event, &xHigherPriorityTaskWoken) == pdPASS )
 		{
 			portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
@@ -89,8 +89,10 @@ ADXL_status_t ADXL_SetEvent(ADXL_FSM_Events evt)
 	}
 	else
 	{
-		xQueueSend(ADXL_EvtQueue, &user_event, 0);
-		ret_val = ADXL_SUCCESS;
+		if(xQueueSend(ADXL_EvtQueue, &user_event, 0) == pdPASS)
+		{
+			ret_val = ADXL_SUCCESS;
+		}
 	}
 	return ret_val;
 }

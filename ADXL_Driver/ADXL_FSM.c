@@ -92,25 +92,32 @@ static void ADXL_FSM_ErrorCallback()
  */
 void ADXL_TimeoutEvent()
 {
-	StreamFsmData.evt_callback(ADXL_EVT_TIMEOUT);
+    if(StreamFsmData.evt_callback(ADXL_EVT_TIMEOUT) != ADXL_SUCCESS)
+    {
+        StreamFsmData.error_callback(ADXL_ERR_QUEUE_FAILURE);
+    }
 }
 
-void ADXL_FSM_Init(uint8_t fifo_samples, fsm_error_callback error_cb, fsm_set_event_callback event_cb, helper_external_callbacks *ext_callbacks)
+ADXL_status_t ADXL_FSM_Init(uint8_t fifo_samples, fsm_error_callback error_cb, fsm_set_event_callback event_cb, helper_external_callbacks *ext_callbacks)
 {
+	ADXL_status_t ret_val = ADXL_FAILURE;
 	StreamFsmData.evt_callback = event_cb;
 	StreamFsmData.error_callback = error_cb;
 	StreamFsmData.fifo_samples_num = fifo_samples;
 
 	uint8_t tmr_id = EvtTimerInit(ADXL_TimeoutEvent);
-
-	Stream_WaitingSubFsmInit(event_cb, fifo_samples);
-	Stream_FlushingSubFsmInit(event_cb);
-	Stream_HaltedSubFsmInit(event_cb, tmr_id);
-	Stream_StoppingSubFsmInit(event_cb);
-	Stream_UnexpectedIRQSubFsmInit(event_cb);
-	StreamFsmData.ext_callbacks = ext_callbacks;
-	Fsm_Init(&StreamFsmContext, StreamHalted_StateHandler , &StreamFsmData, ADXL_FSM_ErrorCallback);
-
+	if(tmr_id != EVT_TIMER_INVALID_ID)
+	{
+		Stream_WaitingSubFsmInit(event_cb, fifo_samples);
+		Stream_FlushingSubFsmInit(event_cb);
+		Stream_HaltedSubFsmInit(event_cb, tmr_id);
+		Stream_StoppingSubFsmInit(event_cb);
+		Stream_UnexpectedIRQSubFsmInit(event_cb);
+		StreamFsmData.ext_callbacks = ext_callbacks;
+		Fsm_Init(&StreamFsmContext, StreamHalted_StateHandler , &StreamFsmData, ADXL_FSM_ErrorCallback);
+		ret_val = ADXL_SUCCESS;
+	}
+	return ret_val;
 }
 
 static FSM_ret StreamStopping_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)

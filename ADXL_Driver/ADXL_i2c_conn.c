@@ -21,6 +21,7 @@ uint8_t comm_evt_tmr_id;
 
 void ADXL_CommTimeout(void)
 {
+	Current_operation = ADXL_OP_NO_OPERATION;
 	evt_callback(COMM_TIMEOUT);
 }
 
