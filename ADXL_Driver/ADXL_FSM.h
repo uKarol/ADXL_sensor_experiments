@@ -38,8 +38,17 @@ enum
 };
 
 
+typedef enum
+{
+	ADXL_EXT_EVT_STARTED = 0,
+	ADXL_EXT_EVT_STOPPED,
+	ADXL_EXT_EVT_STREAM_COMPLETED,
+};
+
 
 typedef uint16_t ADXL_FSM_Events;
+
+typedef void (*fsm_external_callback)(uint16_t adxl_ext_evt);
 
 typedef void (*fsm_error_callback)(ADXL_Errors_t CurrentError);
 typedef ADXL_status_t (*fsm_set_event_callback)(ADXL_FSM_Events evt);
@@ -47,7 +56,7 @@ typedef ADXL_status_t (*fsm_set_event_callback)(ADXL_FSM_Events evt);
 #define EVT_BUFFER_CAPACITY (10U * sizeof(FsmEvent_t))
 
 uint8_t* ADXL_FSM_GetDataBuffer(void);
-ADXL_status_t ADXL_FSM_Init(uint8_t fifo_samples, fsm_error_callback error_cb, fsm_set_event_callback event_cb, helper_external_callbacks *ext_callbacks);
+ADXL_status_t ADXL_FSM_Init(uint8_t fifo_samples, fsm_error_callback error_cb, fsm_set_event_callback event_cb, fsm_external_callback ext_callbacks);
 void ADXL_FSM_ProcessEvent(FsmEvent_t *user_event);
 ADXL_StreamStatus ADXL_FSM_GetStatus(void);
 

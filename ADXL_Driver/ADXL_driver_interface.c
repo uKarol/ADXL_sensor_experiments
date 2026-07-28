@@ -40,17 +40,13 @@ typedef struct
 	ADXL_Errors_t LastError;
 }ADXL_InternalState_t;
 
+
+helper_external_callbacks *ext_helper_callback;
+
 ADXL_status_t ADXL_InitLowLevel(ADXL_Init_t *init_data);
 
 volatile static ADXL_InternalState_t CurrentState = {DRIVER_NOT_INITIALIZED, ADXL_ERR_NO_ERROR};
 
-/**
- * @brief Read single ADXL register in blockin (polling) mode
- * @param in uint8_t ADXL register address
- * @param out uint8_t* pointer to data read from register
- * @returns ADXL_SUCCESS in case of successful operation
- * 			ADXL_FAILURE in case of error
- */
 
 static bool ADXL_IsErrRecoveravle(ADXL_Errors_t curr_err)
 {
@@ -69,6 +65,7 @@ static bool ADXL_IsErrRecoveravle(ADXL_Errors_t curr_err)
 static inline void ADXL_SetError(ADXL_Errors_t CurrentError)
 {
 	CurrentState.LastError = CurrentError;
+	ext_helper_callback->adxl_error_detected_callback();
 	if(!ADXL_IsErrRecoveravle(CurrentError))
 	{
 		CurrentState.DriverState = DRIVER_ERROR;
@@ -147,7 +144,6 @@ ADXL_status_t ADXL_StartStreamMeasurements(void)
 	{
 		if(ADXL_SetEvent(ADXL_EVT_START_STREAM) == ADXL_SUCCESS)
 		{
-			CurrentState.DriverState = DRIVER_READY;
 			ret_val = ADXL_SUCCESS;
 		}
 		else
@@ -164,7 +160,6 @@ ADXL_status_t ADXL_StopStreamMeasurements(void)
 	{
 		if(ADXL_SetEvent(ADXL_EVT_STOP_REQUEST)== ADXL_SUCCESS)
 		{
-			CurrentState.DriverState = DRIVER_HALTED;
 			ret_val = ADXL_SUCCESS;
 		}
 		else
@@ -273,12 +268,35 @@ ADXL_status_t ADXL_ReadData(int16_t *Xdata, int16_t *Ydata, int16_t *Zdata)
  	return ret_val;
 }
 
+
+void ADXL_fsm_external_callback(uint16_t adxl_ext_evt)
+{
+	switch(adxl_ext_evt)
+	{
+		case ADXL_EXT_EVT_STARTED:
+			ext_helper_callback->adxl_started_callback();
+			CurrentState.DriverState = DRIVER_READY;
+		break;
+		case ADXL_EXT_EVT_STOPPED:
+			ext_helper_callback->adxl_stopped_callback();
+			CurrentState.DriverState = DRIVER_HALTED;
+		break;
+		case ADXL_EXT_EVT_STREAM_COMPLETED:
+			ext_helper_callback->adxl_completed_callback();
+		break;
+		default:
+
+		break;
+	}
+}
+
 ADXL_status_t ADXL_Driver_Init(ADXL_Init_t *init_data)
 {
     ADXL_status_t ret_val = ADXL_FAILURE;
     if(ADXL_InitLowLevel(init_data) == ADXL_SUCCESS)
     {
-        if( ADXL_FSM_Init(init_data->FifoSamples, ADXL_SetError, ADXL_SetEvent, init_data->helper_callbacks) == ADXL_SUCCESS )
+		ext_helper_callback = init_data->helper_callbacks;
+        if( ADXL_FSM_Init(init_data->FifoSamples, ADXL_SetError, ADXL_SetEvent,  ADXL_fsm_external_callback) == ADXL_SUCCESS )
         {
 			if(ADXL_Task_Init() == ADXL_SUCCESS)
 			{

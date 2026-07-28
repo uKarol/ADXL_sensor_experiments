@@ -33,9 +33,7 @@ typedef struct
 	ADXL_Errors_t error_code;
 	ADXL_StreamStatus state; // state when error occured
 	ADXL_FSM_Events evt; // event when error was generated
-
 }ADXL_Err_Desc_t;
-
 
 
 typedef struct
@@ -46,7 +44,7 @@ typedef struct
 	ADXL_StreamStatus current_state;
 	fsm_error_callback error_callback;
 	fsm_set_event_callback evt_callback;
-	helper_external_callbacks *ext_callbacks;
+	fsm_external_callback ext_callbacks;
 }StreamCtxData_t;
 
 
@@ -98,7 +96,7 @@ void ADXL_TimeoutEvent()
     }
 }
 
-ADXL_status_t ADXL_FSM_Init(uint8_t fifo_samples, fsm_error_callback error_cb, fsm_set_event_callback event_cb, helper_external_callbacks *ext_callbacks)
+ADXL_status_t ADXL_FSM_Init(uint8_t fifo_samples, fsm_error_callback error_cb, fsm_set_event_callback event_cb, fsm_external_callback ext_callbacks)
 {
 	ADXL_status_t ret_val = ADXL_FAILURE;
 	StreamFsmData.evt_callback = event_cb;
@@ -146,13 +144,7 @@ static FSM_ret StreamStopping_StateHandler (fsm_context *ctx, FsmEvent_t *user_e
 			}
 			break;
 		case ADXL_EVT_STREAM_HALTED:
-			if(context_data->ext_callbacks != NULL)
-			{
-				if(context_data->ext_callbacks->adxl_stopped_callback != NULL)
-				{
-					context_data->ext_callbacks->adxl_stopped_callback();
-				}
-			}
+			context_data->ext_callbacks(ADXL_EXT_EVT_STOPPED);
 			Fsm_StateTransition(ctx, StreamHalted_StateHandler);
 			ret_val = FSM_OK;
 			break;
@@ -232,13 +224,7 @@ static FSM_ret StreamFlushing_StateHandler (fsm_context *ctx, FsmEvent_t *user_e
 			}
 			break;
 		case ADXL_EVT_FIFO_CLEARED:
-			if(context_data->ext_callbacks != NULL)
-			{
-				if(context_data->ext_callbacks->adxl_started_callback != NULL)
-				{
-					context_data->ext_callbacks->adxl_started_callback();
-				}
-			}
+			context_data->ext_callbacks(ADXL_EXT_EVT_STARTED);
 			Fsm_StateTransition(ctx,StreamWaiting_StateHandler);
 			ret_val = FSM_OK;
 			break;
@@ -360,13 +346,7 @@ FSM_ret StreamCompleted_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 	{
 		case FSM_INITIAL_EVENT:
 			context_data->current_state = STREAM_COMPLETED;
-			if(context_data->ext_callbacks != NULL)
-			{
-				if(context_data->ext_callbacks->adxl_completed_callback != NULL)
-				{
-					context_data->ext_callbacks->adxl_completed_callback();
-				}
-			}
+			context_data->ext_callbacks(ADXL_EXT_EVT_STREAM_COMPLETED);
 			break;
 		case ADXL_EVT_BUFFER_RELEASE_REQ:
 			Fsm_StateTransition(ctx, StreamWaiting_StateHandler);
@@ -394,13 +374,6 @@ FSM_ret StreamError_StateHandler (fsm_context *ctx, FsmEvent_t *user_event)
 	switch(current_event)
 	{
 		case FSM_INITIAL_EVENT:
-			if(context_data->ext_callbacks != NULL)
-			{
-				if(context_data->ext_callbacks->adxl_error_detected_callback != NULL)
-				{
-					context_data->ext_callbacks->adxl_error_detected_callback();
-				}
-			}
 			context_data->current_state = STREAM_ERROR;
 			context_data->error_callback(context_data->stream_errors.error_code);
 			break;

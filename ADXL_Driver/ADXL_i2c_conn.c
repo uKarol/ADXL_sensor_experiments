@@ -78,11 +78,11 @@ ADXL_Errors_t ADXL_ReadMultipleRegsNonBlocking(uint8_t reg_id, uint8_t *pValueOu
 	ADXL_Errors_t ret_val = ADXL_ERR_COMMUNICATION_LOST;
 	if(Current_operation == ADXL_OP_NO_OPERATION)
 	{
+		Current_operation = ADXL_READ_MULTIPLE_REGS;
 		if(HAL_I2C_Mem_Read_DMA(&hi2c1, ADEXL_ID, reg_id, 1, pValueOut, size) == HAL_OK )
 		{
 			EvtTimerStart(comm_evt_tmr_id, COMM_OPERATION_TIMEOUT);
 			ret_val = ADXL_ERR_NO_ERROR;
-			Current_operation = ADXL_READ_MULTIPLE_REGS;
 		}
 	}
 	return ret_val;
@@ -93,11 +93,11 @@ ADXL_Errors_t ADXL_ReadRegNonBlocking(uint8_t reg_id, uint8_t *pValueOut)
 	ADXL_Errors_t ret_val = ADXL_ERR_COMMUNICATION_LOST;
 	if(Current_operation == ADXL_OP_NO_OPERATION)
 	{
+		Current_operation = ADXL_READ_SINGLE_REG;
 		if(HAL_I2C_Mem_Read_DMA(&hi2c1, ADEXL_ID, reg_id, 1, pValueOut, 1) == HAL_OK )
 		{
 			EvtTimerStart(comm_evt_tmr_id, COMM_OPERATION_TIMEOUT);
 			ret_val = ADXL_ERR_NO_ERROR;
-			Current_operation = ADXL_READ_SINGLE_REG;
 		}
 	}
 	return ret_val;
@@ -108,11 +108,12 @@ ADXL_Errors_t ADXL_WriteRegNonBlocking(uint8_t reg_id, uint8_t *DataIn)
 	ADXL_Errors_t ret_val = ADXL_ERR_COMMUNICATION_LOST;
 	if(Current_operation == ADXL_OP_NO_OPERATION)
 	{
+		Current_operation = ADXL_WRITE_SINGLE_REG;
 		if(HAL_I2C_Mem_Write_IT(&hi2c1, ADEXL_ID, reg_id, 1, DataIn, 1) == HAL_OK)
 		{
 			EvtTimerStart(comm_evt_tmr_id, COMM_OPERATION_TIMEOUT);
 			ret_val = ADXL_ERR_NO_ERROR;
-			Current_operation = ADXL_WRITE_SINGLE_REG;
+
 		}
 	}
 	return ret_val;
