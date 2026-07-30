@@ -27,44 +27,64 @@ void ADXL_CommTimeout(void)
 
 void ADXL_I2CTxComplete(void)
 {
-	EvtTimerStop(comm_evt_tmr_id);
-	if(Current_operation == ADXL_WRITE_SINGLE_REG)
+	if(EvtTimerStop(comm_evt_tmr_id) == EVT_TIMER_OK)
 	{
-		Current_operation = ADXL_OP_NO_OPERATION;
-		evt_callback(SINGLE_REG_WRITE_FINISH);
+		if(Current_operation == ADXL_WRITE_SINGLE_REG)
+		{
+			Current_operation = ADXL_OP_NO_OPERATION;
+			evt_callback(SINGLE_REG_WRITE_FINISH);
+		}
+		else
+		{
+			Current_operation = ADXL_OP_NO_OPERATION;
+			evt_callback(UNEXPECTED_EVT);
+		}
 	}
 	else
 	{
-		Current_operation = ADXL_OP_NO_OPERATION;
-		evt_callback(UNEXPECTED_EVT);
+		Current_operation = ADXL_OP_ERROR;
+		evt_callback(COMM_TIMER_FAILURE);
 	}
 }
 
 void ADXL_I2CRxComplete(void)
 {
-	EvtTimerStop(comm_evt_tmr_id);
-	switch(Current_operation)
+	if(EvtTimerStop(comm_evt_tmr_id) == EVT_TIMER_OK)
 	{
-		case ADXL_READ_SINGLE_REG:
-			Current_operation = ADXL_OP_NO_OPERATION;
-			evt_callback(SINGLE_REG_READ_FINISH);
-			break;
+		switch(Current_operation)
+		{
+			case ADXL_READ_SINGLE_REG:
+				Current_operation = ADXL_OP_NO_OPERATION;
+				evt_callback(SINGLE_REG_READ_FINISH);
+				break;
 
-		case ADXL_READ_MULTIPLE_REGS:
-			Current_operation = ADXL_OP_NO_OPERATION;
-			evt_callback(MULTIPLE_REGS_READ_FINISH);
-			break;
-		default:
-			Current_operation = ADXL_OP_NO_OPERATION;
-			evt_callback(UNEXPECTED_EVT);
+			case ADXL_READ_MULTIPLE_REGS:
+				Current_operation = ADXL_OP_NO_OPERATION;
+				evt_callback(MULTIPLE_REGS_READ_FINISH);
+				break;
+			default:
+				Current_operation = ADXL_OP_NO_OPERATION;
+				evt_callback(UNEXPECTED_EVT);
+		}
+	}
+	else
+	{
+		Current_operation = ADXL_OP_ERROR;
+		evt_callback(COMM_TIMER_FAILURE);
 	}
 }
 
-void ADXLConn_Init(conn_evt_callback callback)
+ADXL_status_t ADXLConn_Init(conn_evt_callback callback)
 {
+	ADXL_status_t ret_val = ADXL_FAILURE;
 	evt_callback = callback;
 	Current_operation = ADXL_OP_NO_OPERATION;
 	comm_evt_tmr_id = EvtTimerInit(ADXL_CommTimeout);
+	if((comm_evt_tmr_id) != EVT_TIMER_INVALID_ID )
+	{
+		ret_val = ADXL_SUCCESS;
+	}
+	return ret_val;
 }
 
 
@@ -81,8 +101,18 @@ ADXL_Errors_t ADXL_ReadMultipleRegsNonBlocking(uint8_t reg_id, uint8_t *pValueOu
 		Current_operation = ADXL_READ_MULTIPLE_REGS;
 		if(HAL_I2C_Mem_Read_DMA(&hi2c1, ADEXL_ID, reg_id, 1, pValueOut, size) == HAL_OK )
 		{
-			EvtTimerStart(comm_evt_tmr_id, COMM_OPERATION_TIMEOUT);
-			ret_val = ADXL_ERR_NO_ERROR;
+			if(EvtTimerStart(comm_evt_tmr_id, COMM_OPERATION_TIMEOUT) == EVT_TIMER_OK )
+			{
+				ret_val = ADXL_ERR_NO_ERROR;
+			}
+			else
+			{
+				Current_operation = ADXL_OP_ERROR;
+			}
+		}
+		else
+		{
+			Current_operation = ADXL_OP_ERROR;
 		}
 	}
 	return ret_val;
@@ -96,8 +126,18 @@ ADXL_Errors_t ADXL_ReadRegNonBlocking(uint8_t reg_id, uint8_t *pValueOut)
 		Current_operation = ADXL_READ_SINGLE_REG;
 		if(HAL_I2C_Mem_Read_DMA(&hi2c1, ADEXL_ID, reg_id, 1, pValueOut, 1) == HAL_OK )
 		{
-			EvtTimerStart(comm_evt_tmr_id, COMM_OPERATION_TIMEOUT);
-			ret_val = ADXL_ERR_NO_ERROR;
+			if(EvtTimerStart(comm_evt_tmr_id, COMM_OPERATION_TIMEOUT) == EVT_TIMER_OK )
+			{
+				ret_val = ADXL_ERR_NO_ERROR;
+			}
+			else
+			{
+				Current_operation = ADXL_OP_ERROR;
+			}
+		}
+		else
+		{
+			Current_operation = ADXL_OP_ERROR;
 		}
 	}
 	return ret_val;
@@ -111,9 +151,18 @@ ADXL_Errors_t ADXL_WriteRegNonBlocking(uint8_t reg_id, uint8_t *DataIn)
 		Current_operation = ADXL_WRITE_SINGLE_REG;
 		if(HAL_I2C_Mem_Write_IT(&hi2c1, ADEXL_ID, reg_id, 1, DataIn, 1) == HAL_OK)
 		{
-			EvtTimerStart(comm_evt_tmr_id, COMM_OPERATION_TIMEOUT);
-			ret_val = ADXL_ERR_NO_ERROR;
-
+			if(EvtTimerStart(comm_evt_tmr_id, COMM_OPERATION_TIMEOUT) == EVT_TIMER_OK )
+			{
+				ret_val = ADXL_ERR_NO_ERROR;
+			}
+			else
+			{
+				Current_operation = ADXL_OP_ERROR;
+			}
+		}
+		else
+		{
+			Current_operation = ADXL_OP_ERROR;
 		}
 	}
 	return ret_val;
@@ -122,9 +171,13 @@ ADXL_Errors_t ADXL_WriteRegNonBlocking(uint8_t reg_id, uint8_t *DataIn)
 ADXL_Errors_t ADXL_WriteRegBlocking(uint8_t reg_id, uint8_t DataIn)
 {
 	ADXL_Errors_t ret_val = ADXL_ERR_NO_ERROR;
-	if(HAL_I2C_Mem_Write(&hi2c1, ADEXL_ID, reg_id, 1, &DataIn, 1, BLOCKING_DEF_TIMEOUT) != HAL_OK)
+	if(Current_operation == ADXL_OP_NO_OPERATION)
 	{
-		ret_val = ADXL_ERR_COMMUNICATION_LOST;
+		if(HAL_I2C_Mem_Write(&hi2c1, ADEXL_ID, reg_id, 1, &DataIn, 1, BLOCKING_DEF_TIMEOUT) != HAL_OK)
+		{
+			Current_operation = ADXL_OP_ERROR;
+			ret_val = ADXL_ERR_COMMUNICATION_LOST;
+		}
 	}
 	return ret_val;
 }
@@ -133,9 +186,13 @@ ADXL_Errors_t ADXL_ReadRegBlocking(uint8_t reg_id, uint8_t *pValueOut)
 {
 	ADXL_Errors_t ret_val = ADXL_ERR_NO_ERROR;
 
-	if(HAL_I2C_Mem_Read(&hi2c1, ADEXL_ID, reg_id, 1, pValueOut, 1, BLOCKING_DEF_TIMEOUT) != HAL_OK)
+	if(Current_operation == ADXL_OP_NO_OPERATION)
 	{
-		ret_val = ADXL_ERR_COMMUNICATION_LOST;
+		if(HAL_I2C_Mem_Read(&hi2c1, ADEXL_ID, reg_id, 1, pValueOut, 1, BLOCKING_DEF_TIMEOUT) != HAL_OK)
+		{
+			Current_operation = ADXL_OP_ERROR;
+			ret_val = ADXL_ERR_COMMUNICATION_LOST;
+		}
 	}
 	return ret_val;
 }
@@ -143,10 +200,13 @@ ADXL_Errors_t ADXL_ReadRegBlocking(uint8_t reg_id, uint8_t *pValueOut)
 ADXL_Errors_t ADXL_ReadMultipleRegsBlocking(uint8_t reg_id, uint8_t *pValueOut, uint8_t size)
 {
 	ADXL_Errors_t ret_val = ADXL_ERR_NO_ERROR;
-
-	if(HAL_I2C_Mem_Read(&hi2c1, ADEXL_ID, reg_id, 1, pValueOut, size, BLOCKING_DEF_TIMEOUT) != HAL_OK )
+	if(Current_operation == ADXL_OP_NO_OPERATION)
 	{
-		ret_val = ADXL_ERR_COMMUNICATION_LOST;
+		if(HAL_I2C_Mem_Read(&hi2c1, ADEXL_ID, reg_id, 1, pValueOut, size, BLOCKING_DEF_TIMEOUT) != HAL_OK )
+		{
+			Current_operation = ADXL_OP_ERROR;
+			ret_val = ADXL_ERR_COMMUNICATION_LOST;
+		}
 	}
 	return ret_val;
 }

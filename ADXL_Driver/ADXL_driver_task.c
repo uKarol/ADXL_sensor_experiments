@@ -36,10 +36,13 @@ ADXL_status_t ADXL_Task_Init()
 	ADXL_status_t ret_val = ADXL_FAILURE;
 	BaseType_t task_result;
 	ADXL_EvtQueue = xQueueCreate(EVT_QUEUE_CAPACITY, sizeof(FsmEvent_t));
-	task_result = xTaskCreate(ADXL_task, "task_ADXL", ADXL_STACK_SIZE, NULL, 4, &adxl_task_handle);
-	if((task_result == pdPASS) && (ADXL_EvtQueue != NULL))
+	if(ADXL_EvtQueue != NULL)
 	{
-		ret_val = ADXL_SUCCESS;
+	task_result = xTaskCreate(ADXL_task, "task_ADXL", ADXL_STACK_SIZE, NULL, 4, &adxl_task_handle);
+		if(task_result == pdPASS)
+		{
+			ret_val = ADXL_SUCCESS;
+		}
 	}
 	
 	return ret_val;

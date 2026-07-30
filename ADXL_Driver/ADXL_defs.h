@@ -72,7 +72,8 @@ typedef enum
 	ADXL_ERR_UNEXPECTED_REG_VAL,	// not recoverable, reinit required
 	ADXL_ERR_UNEXPECTED_WATERMARK,	// recoverable
 	ADXL_ERR_QUEUE_FAILURE,			// not recoverable
-	ADXL_ERR_COMM_TIMEOUT
+	ADXL_ERR_COMM_TIMEOUT,
+	ADXL_ERR_TIMER_FAILURE,
 }ADXL_Errors_t;
 
 typedef enum

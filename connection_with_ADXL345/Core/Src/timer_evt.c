@@ -57,23 +57,29 @@ uint8_t EvtTimerInit(timer_cb callback)
 	return ret_val;
 }
 
-void EvtTimerStart(uint8_t timer_id, uint8_t period)
+EvtTimerStatus_t EvtTimerStart(uint8_t timer_id, uint32_t period)
 {
+	EvtTimerStatus_t ret_val = EVT_TIMER_ERROR;
 	if(timer_id < MAX_TMR_NUM)
 	{
 		internal_timer* current_tmr = &(internal_timers[timer_id]);
 		current_tmr->timer_period = period;
 		current_tmr->period_ctr = 0;
 		current_tmr->state = TMR_ACTIVE;
+		ret_val = EVT_TIMER_OK;
 	}
+	return ret_val;
 }
 
-void EvtTimerStop(uint8_t timer_id)
+EvtTimerStatus_t EvtTimerStop(uint8_t timer_id)
 {
+	EvtTimerStatus_t ret_val = EVT_TIMER_ERROR;
 	if(timer_id < MAX_TMR_NUM)
 	{
 		internal_timer* current_tmr = &(internal_timers[timer_id]);
 		current_tmr->period_ctr = 0;
 		current_tmr->state = TMR_NOT_ACTIVE;
+		ret_val = EVT_TIMER_OK;
 	}
+	return ret_val;
 }

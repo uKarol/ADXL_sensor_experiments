@@ -188,6 +188,9 @@ void ADXL_ConnCallback(ADXL_ConnEvt evt)
 		case COMM_TIMEOUT:
 			evt_ret_val = ADXL_SetEvent(ADXL_EVT_COMM_TIMEOUT);
 			break;
+		case COMM_TIMER_FAILURE:
+			evt_ret_val = ADXL_SetEvent(ADXL_EVT_TIMER_FAILURE);
+			break;
 	}
 	if(evt_ret_val != ADXL_SUCCESS)
 	{
@@ -274,12 +277,12 @@ void ADXL_fsm_external_callback(uint16_t adxl_ext_evt)
 	switch(adxl_ext_evt)
 	{
 		case ADXL_EXT_EVT_STARTED:
-			ext_helper_callback->adxl_started_callback();
 			CurrentState.DriverState = DRIVER_READY;
+			ext_helper_callback->adxl_started_callback();
 		break;
 		case ADXL_EXT_EVT_STOPPED:
-			ext_helper_callback->adxl_stopped_callback();
 			CurrentState.DriverState = DRIVER_HALTED;
+			ext_helper_callback->adxl_stopped_callback();
 		break;
 		case ADXL_EXT_EVT_STREAM_COMPLETED:
 			ext_helper_callback->adxl_completed_callback();
@@ -290,19 +293,40 @@ void ADXL_fsm_external_callback(uint16_t adxl_ext_evt)
 	}
 }
 
+bool ADXL_ValidateCallbacks(helper_external_callbacks *helper_callbacks)
+{
+	bool ret_val = false;
+	if(helper_callbacks != NULL)
+	{
+		if((helper_callbacks->adxl_completed_callback != NULL) &&
+		(helper_callbacks->adxl_error_detected_callback != NULL) &&
+		(helper_callbacks->adxl_started_callback != NULL) &&
+		(helper_callbacks->adxl_stopped_callback != NULL)
+		)
+		{
+			ret_val = true;
+		}
+	}
+	return ret_val;
+}
+
 ADXL_status_t ADXL_Driver_Init(ADXL_Init_t *init_data)
 {
     ADXL_status_t ret_val = ADXL_FAILURE;
-    if(ADXL_InitLowLevel(init_data) == ADXL_SUCCESS)
+    if( (init_data != NULL) && (ADXL_ValidateCallbacks(init_data->helper_callbacks)) )
     {
+
 		ext_helper_callback = init_data->helper_callbacks;
-        if( ADXL_FSM_Init(init_data->FifoSamples, ADXL_SetError, ADXL_SetEvent,  ADXL_fsm_external_callback) == ADXL_SUCCESS )
-        {
-			if(ADXL_Task_Init() == ADXL_SUCCESS)
+		if(ADXL_InitLowLevel(init_data) == ADXL_SUCCESS)
+		{
+			if( ADXL_FSM_Init(init_data->FifoSamples, ADXL_SetError, ADXL_SetEvent,  ADXL_fsm_external_callback) == ADXL_SUCCESS )
 			{
-				ret_val = ADXL_SUCCESS;
+				if(ADXL_Task_Init() == ADXL_SUCCESS)
+				{
+					ret_val = ADXL_SUCCESS;
+				}
 			}
-        }
+		}
     }
     return ret_val;
 }
@@ -315,7 +339,10 @@ ADXL_status_t ADXL_Driver_Init(ADXL_Init_t *init_data)
 ADXL_status_t ADXL_InitLowLevel(ADXL_Init_t *init_data)
 {
 	ADXL_status_t ret_val = ADXL_SUCCESS;
-	ADXLConn_Init(ADXL_ConnCallback);
+	if( ADXLConn_Init(ADXL_ConnCallback) != ADXL_SUCCESS)
+	{
+		return ADXL_FAILURE;
+	}
 	RegConfDesc reg_init_sequence[] = {
 			{DEV_ID_REG, DEV_ID, VERIFY_REG},										// read DEV ID reg - check if device has proper ID
 			{FIFO_CTL, ADXL_FIFO_CTL_STREAM | (init_data->FifoSamples & FIFO_CTL_SAMPLES_MASK), WRITE_REG},	// configure FIFO - set mode stream, set wartemark to 16 samples

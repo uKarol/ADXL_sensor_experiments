@@ -108,8 +108,15 @@ static FSM_ret StreamHalted_SettingPowerCTL (fsm_context *ctx, FsmEvent_t *user_
 		case ADXL_EVT_I2C_RX_COMPLETED:
 			if(context_data->dma_out_data == POWER_CTL_MEASURE)
 			{
-				EvtTimerStart(context_data->evt_tmr_id, 100);
-				Fsm_StateTransition(ctx, StreamHalted_Waiting);
+				if(EvtTimerStart(context_data->evt_tmr_id, 100) == EVT_TIMER_OK)
+				{
+					Fsm_StateTransition(ctx, StreamHalted_Waiting);
+				}
+				else
+				{
+					ret_val = FSM_ERROR;
+					context_data->last_error = ADXL_ERR_TIMER_FAILURE;
+				}
 				break;
 			}
 			else

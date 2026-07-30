@@ -72,14 +72,21 @@ uint8_t EvtTimerInit(timer_cb callback)
 	return ret_val;
 }
 
-void EvtTimerStart(uint8_t timer_id, uint8_t period)
+EvtTimerStatus_t EvtTimerStart(uint8_t timer_id, uint32_t period)
 {
+	EvtTimerStatus_t ret_val = EVT_TIMER_ERROR;
 	if(timer_id < MAX_TMR_NUM)
 	{
 		internal_timer* current_tmr = &(internal_timers[timer_id]);
-		xTimerChangePeriod(current_tmr->internal_ostmr, pdMS_TO_TICKS(period), 0);
-		xTimerStart(current_tmr->internal_ostmr, 0);
+		if(xTimerChangePeriod(current_tmr->internal_ostmr, pdMS_TO_TICKS(period), 0) == pdPASS)
+		{
+			if(xTimerStart(current_tmr->internal_ostmr, 0) == pdPASS)
+			{
+				ret_val = EVT_TIMER_OK;
+			}
+		}
 	}
+	return ret_val;
 }
 
 static bool IsIsr()
@@ -94,18 +101,26 @@ static bool IsIsr()
 	}
 }
 
-void EvtTimerStop(uint8_t timer_id)
+EvtTimerStatus_t EvtTimerStop(uint8_t timer_id)
 {
+	EvtTimerStatus_t ret_val = EVT_TIMER_ERROR;
 	if(timer_id < MAX_TMR_NUM)
 	{
 		internal_timer* current_tmr = &(internal_timers[timer_id]);
 		if(IsIsr())
 		{
-			xTimerStopFromISR(current_tmr->internal_ostmr, 0);
+			if(xTimerStopFromISR(current_tmr->internal_ostmr, 0) == pdPASS)
+			{
+				ret_val = EVT_TIMER_OK;
+			}
 		}
 		else
 		{
-			xTimerStop(current_tmr->internal_ostmr, 0);
+			if(xTimerStop(current_tmr->internal_ostmr, 0) == pdPASS)
+			{
+				ret_val = EVT_TIMER_OK;
+			}
 		}
 	}
+	return ret_val;
 }

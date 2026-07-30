@@ -16,6 +16,7 @@ typedef enum
 	ADXL_WRITE_SINGLE_REG,
 	ADXL_READ_SINGLE_REG,
 	ADXL_READ_MULTIPLE_REGS,
+	ADXL_OP_ERROR,
 }ADXL_Operation_t;
 
 typedef enum
@@ -24,6 +25,7 @@ typedef enum
 	SINGLE_REG_READ_FINISH,
 	MULTIPLE_REGS_READ_FINISH,
 	COMM_TIMEOUT,
+	COMM_TIMER_FAILURE,
 	UNEXPECTED_EVT,
 }ADXL_ConnEvt;
 
@@ -31,7 +33,7 @@ typedef void(*conn_evt_callback)(ADXL_ConnEvt evt);
 
 void ADXL_I2CRxComplete(void);
 void ADXL_I2CTxComplete(void);
-void ADXLConn_Init(conn_evt_callback callback);
+ADXL_status_t ADXLConn_Init(conn_evt_callback callback);
 ADXL_Operation_t ADXLConn_GetCurrentOperation();
 
 ADXL_Errors_t ADXL_ReadMultipleRegsNonBlocking(uint8_t reg_id, uint8_t *pValueOut, uint8_t size);
