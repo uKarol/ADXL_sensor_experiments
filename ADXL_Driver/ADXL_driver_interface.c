@@ -65,11 +65,11 @@ static bool ADXL_IsErrRecoveravle(ADXL_Errors_t curr_err)
 static inline void ADXL_SetError(ADXL_Errors_t CurrentError)
 {
 	CurrentState.LastError = CurrentError;
-	ext_helper_callback->adxl_error_detected_callback();
 	if(!ADXL_IsErrRecoveravle(CurrentError))
 	{
 		CurrentState.DriverState = DRIVER_ERROR;
 	}
+	ext_helper_callback->adxl_error_detected_callback();
 }
 
 /**

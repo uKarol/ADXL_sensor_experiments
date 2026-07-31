@@ -21,7 +21,7 @@ uint8_t comm_evt_tmr_id;
 
 void ADXL_CommTimeout(void)
 {
-	Current_operation = ADXL_OP_NO_OPERATION;
+	Current_operation = ADXL_OP_ERROR;
 	evt_callback(COMM_TIMEOUT);
 }
 
@@ -178,6 +178,10 @@ ADXL_Errors_t ADXL_WriteRegBlocking(uint8_t reg_id, uint8_t DataIn)
 			Current_operation = ADXL_OP_ERROR;
 			ret_val = ADXL_ERR_COMMUNICATION_LOST;
 		}
+	}
+	else
+	{
+		ret_val = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
 	}
 	return ret_val;
 }

@@ -44,12 +44,12 @@ typedef enum
 	ADXL_EXT_EVT_STARTED = 0,
 	ADXL_EXT_EVT_STOPPED,
 	ADXL_EXT_EVT_STREAM_COMPLETED,
-};
+}ADXL_ExternaEvt;
 
 
 typedef uint16_t ADXL_FSM_Events;
 
-typedef void (*fsm_external_callback)(uint16_t adxl_ext_evt);
+typedef void (*fsm_external_callback)(ADXL_ExternaEvt adxl_ext_evt);
 
 typedef void (*fsm_error_callback)(ADXL_Errors_t CurrentError);
 typedef ADXL_status_t (*fsm_set_event_callback)(ADXL_FSM_Events evt);
