@@ -1,0 +1,164 @@
+/*
+ * ADXL_SubFSM_HALTED.c
+ *
+ *  Created on: Jun 28, 2026
+ *      Author: Karol
+ */
+
+#include "ADXL_SubFSM_HALTED.h"
+#include "ADXL_FSM.h"
+#include "ADXL_defs.h"
+#include "fsm.h"
+#include "timer_evt.h"
+#include  "ADXL_i2c_conn.h"
+
+typedef struct
+{
+	ADXL_Errors_t last_error;
+	uint8_t dma_out_data;
+	uint8_t data_in;
+	fsm_set_event_callback evt_callback;
+	uint8_t evt_tmr_id;
+}StreamHaltedCtxData_t;
+
+static StreamHaltedCtxData_t StreamHaltedFsmData;
+static fsm_context StreamHaltedFsmContext;
+
+static FSM_ret StreamHalted_IdleStateHandler (fsm_context *ctx, FsmEvent_t *user_event);
+static FSM_ret StreamHalted_SettingPowerCTL (fsm_context *ctx, FsmEvent_t *user_event);
+static FSM_ret StreamHalted_Waiting (fsm_context *ctx, FsmEvent_t *user_event);
+
+void Stream_HaltedReset()
+{
+	StreamHaltedFsmData.last_error = ADXL_ERR_NO_ERROR;
+	Fsm_StateTransition(&StreamHaltedFsmContext, StreamHalted_IdleStateHandler);
+}
+
+static void FlushingSubFsmErrorCallback()
+{
+	Fsm_StateTransition(&StreamHaltedFsmContext, StreamHalted_IdleStateHandler);
+}
+
+void Stream_HaltedSubFsmInit(fsm_set_event_callback event_cb, uint8_t evt_tmr_id)
+{
+	StreamHaltedFsmData.evt_tmr_id = evt_tmr_id;
+	StreamHaltedFsmData.evt_callback = event_cb;
+	Fsm_Init(&StreamHaltedFsmContext, StreamHalted_IdleStateHandler , &StreamHaltedFsmData, FlushingSubFsmErrorCallback);
+}
+
+FSM_ret ADXL_FSMHalted_ProcessEvent(FsmEvent_t *user_event)
+{
+	return Fsm_ProcessEvent(&StreamHaltedFsmContext, user_event);
+}
+
+ADXL_Errors_t ADXL_FSMHalted_GetError()
+{
+	return StreamHaltedFsmData.last_error;
+}
+
+
+static FSM_ret StreamHalted_IdleStateHandler (fsm_context *ctx, FsmEvent_t *user_event)
+{
+	FSM_ret ret_val = FSM_OK;
+	ADXL_FSM_Events current_event = (ADXL_FSM_Events)user_event->user_event;
+	StreamHaltedCtxData_t *context_data = (StreamHaltedCtxData_t*)ctx->user_data;
+
+	switch (current_event)
+	{
+		case FSM_INITIAL_EVENT:
+			break;
+		case ADXL_EVT_START_STREAM:
+			context_data->data_in = POWER_CTL_MEASURE;
+			if(ADXL_WriteRegNonBlocking(POWER_CTL, &(context_data->data_in)) == ADXL_ERR_NO_ERROR)
+			{
+				Fsm_StateTransition(ctx, StreamHalted_SettingPowerCTL);
+			}
+			else
+			{
+				ret_val = FSM_ERROR;
+				context_data->last_error = ADXL_ERR_COMMUNICATION_LOST;
+			}
+			break;
+		default:
+			break;
+	}
+
+	return ret_val;
+}
+
+static FSM_ret StreamHalted_SettingPowerCTL (fsm_context *ctx, FsmEvent_t *user_event)
+{
+	FSM_ret ret_val = FSM_OK;
+	ADXL_FSM_Events current_event = (ADXL_FSM_Events)user_event->user_event;
+	StreamHaltedCtxData_t *context_data = (StreamHaltedCtxData_t*)ctx->user_data;
+
+	switch (current_event)
+	{
+		case FSM_INITIAL_EVENT:
+			break;
+		case ADXL_EVT_I2C_TX_COMPLETED:
+
+			if(ADXL_ReadRegNonBlocking(POWER_CTL, &(context_data->dma_out_data))!= ADXL_ERR_NO_ERROR)
+			{
+				ret_val = FSM_ERROR;
+				context_data->last_error = ADXL_ERR_COMMUNICATION_LOST;
+			}
+
+			break;
+		case ADXL_EVT_I2C_RX_COMPLETED:
+			if(context_data->dma_out_data == POWER_CTL_MEASURE)
+			{
+				if(EvtTimerStart(context_data->evt_tmr_id, 100) == EVT_TIMER_OK)
+				{
+					Fsm_StateTransition(ctx, StreamHalted_Waiting);
+				}
+				else
+				{
+					ret_val = FSM_ERROR;
+					context_data->last_error = ADXL_ERR_TIMER_FAILURE;
+				}
+				break;
+			}
+			else
+			{
+
+			} // fallthrough
+
+		default:
+			ret_val = FSM_ERROR;
+			context_data->last_error = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
+			break;
+	}
+
+	return ret_val;
+}
+
+static FSM_ret StreamHalted_Waiting (fsm_context *ctx, FsmEvent_t *user_event)
+{
+	FSM_ret ret_val = FSM_OK;
+	ADXL_FSM_Events current_event = (ADXL_FSM_Events)user_event->user_event;
+	StreamHaltedCtxData_t *context_data = (StreamHaltedCtxData_t*)ctx->user_data;
+
+	switch (current_event)
+	{
+		case FSM_INITIAL_EVENT:
+			break;
+		case ADXL_EVT_TIMEOUT:
+			if(context_data->evt_callback(ADXL_EVT_SENSOR_ENABLED) == ADXL_SUCCESS )
+			{
+				Fsm_StateTransition(ctx, StreamHalted_IdleStateHandler);
+			}
+			else
+			{
+				ret_val = FSM_ERROR;
+				context_data->last_error = ADXL_ERR_QUEUE_FAILURE;
+			}
+			break;
+		default:
+			ret_val = FSM_ERROR;
+			context_data->last_error = ADXL_ERR_UNEXPECTED_BEHAVIOUR;
+		break;
+	}
+
+	return ret_val;
+}

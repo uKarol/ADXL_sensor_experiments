@@ -10,8 +10,12 @@
 #include "UART_Communication.h"
 #include "MEASUREMENT_SubFSM_Processing.h"
 #include "fsm.h"
-#include "simple_queue.h"
 #include <string.h>
+#include <stdbool.h>
+#include "FreeRTOS.h"
+#include "queue.h"
+#include "task.h"
+#include "cmsis_gcc.h"
 
 #define READOUT_NUM 100U
 
@@ -38,11 +42,11 @@ typedef struct
 
 MeasurementFSM_Data_t MeasurementData;
 
-#define EVT_BUFFER_CAPACITY (10U * sizeof(FsmEvent_t))
+#define EVT_BUFFER_CAPACITY (10U)
 
 
-uint8_t measurement_queue_buffer[EVT_BUFFER_CAPACITY];
-SimpleQueue_t MeasurementQueue;
+QueueHandle_t Measurement_EvtQueue;
+TaskHandle_t measurement_task_handle;
 
 static FSM_ret MeasurementWaiting_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
 static FSM_ret MeasurementProcessing_StateHandler (fsm_context *ctx, FsmEvent_t *user_event);
@@ -113,14 +117,14 @@ void MeasurementTransmitCompleted(){
 void MeasurementFSM_Init()
 {
 	Fsm_Init(&MeasurementFsmContext, MeasurementWaiting_StateHandler, &MeasurementFsmData, MeasurementErrorCallback);
-	Measurement_SetEvent(FSM_INITIAL_EVENT);
+
 }
 
+#define MEASURMENT_STACK_SIZE 512U
 
 measurement_error_t Measurement_Init(MeasurementInitStruct *init_data, measurement_err_callback error_cb)
 {
 	measurement_error_t ret_val = MEAS_INIT_FAILURE;
-	SimpleQueueInit(&MeasurementQueue, measurement_queue_buffer, EVT_BUFFER_CAPACITY);
 
 	ADXL_Init_t init_struct = {init_data->number_of_fifo_samples, &adxl_callbacks};
 
@@ -130,15 +134,41 @@ measurement_error_t Measurement_Init(MeasurementInitStruct *init_data, measureme
 		MeasurementProcessingSubFsm_Init(Measurement_SetEvent, init_data->number_of_fifo_samples);
 		MeasurementFSM_Init();
 		ret_val = MEAS_NO_ERROR;
+
+		Measurement_EvtQueue = xQueueCreate(EVT_BUFFER_CAPACITY, sizeof(FsmEvent_t));
+		xTaskCreate(Measurement_task, "task_measurement", MEASURMENT_STACK_SIZE, NULL, 4, &measurement_task_handle);
+		Measurement_SetEvent(FSM_INITIAL_EVENT);
 	}
 	return ret_val;
 
 }
 
+static bool IsIsr()
+{
+	if(__get_IPSR() == 0)
+	{
+		return false;
+	}
+	else
+	{
+		return true;
+	}
+}
+
 void Measurement_SetEvent(MeasurementEvt_t evt)
 {
 	FsmEvent_t user_event = {evt, NULL};
-	SimpleQueuePut(&MeasurementQueue, (void*)(&user_event), sizeof(user_event));
+
+	if(IsIsr())
+	{
+		BaseType_t xHigherPriorityTaskWoken;
+		xQueueSendFromISR(Measurement_EvtQueue, &user_event, &xHigherPriorityTaskWoken);
+		portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
+	}
+	else
+	{
+		xQueueSend(Measurement_EvtQueue, &user_event, 0);
+	}
 }
 
 
@@ -147,17 +177,20 @@ void Measurement_FSM_ProcessEvent(FsmEvent_t *user_event)
 	(void)Fsm_ProcessEvent(&MeasurementFsmContext, user_event);
 }
 
-void Measurement_task()
+void Measurement_task(void *pvParameters)
 {
 	FsmEvent_t current_event;
 
-	if( SimpleQueueGet(&MeasurementQueue, (void*)(&current_event), sizeof(current_event)) == QUEUE_OK)
+	while(1)
 	{
-		Measurement_FSM_ProcessEvent(&current_event);
-	}
-	else
-	{
-		// no event in queue
+		if( xQueueReceive(Measurement_EvtQueue, &current_event, portMAX_DELAY) == pdPASS )
+		{
+			Measurement_FSM_ProcessEvent(&current_event);
+		}
+		else
+		{
+			// no event in queue
+		}
 	}
 }
 

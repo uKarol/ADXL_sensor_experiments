@@ -58,3 +58,6 @@ dkms.conf
 connection_with_ADXL345/Debug/
 connection_with_ADXL345/Drivers/
 
+connection_with_ADXL345_rtos/Debug/
+connection_with_ADXL345_rtos/Drivers/
+connection_with_ADXL345_rtos/Middlewares/
