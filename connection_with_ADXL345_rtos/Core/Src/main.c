@@ -30,6 +30,7 @@
 #include "ADXL_driver_interface.h"
 #include "ADXL_i2c_conn.h"
 #include "MeasurementFSM.h"
+#include "UART_Communication.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -79,12 +80,18 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
-	MeasurementTransmitCompleted();
+	if(huart == &hlpuart1)
+	{
+		UART_ComTxCallback();
+	}
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-	MeasurementRxCompleted();
+	if(huart == &hlpuart1)
+	{
+		UART_ComRxCallback();
+	}
 }
 /* USER CODE END PV */
 

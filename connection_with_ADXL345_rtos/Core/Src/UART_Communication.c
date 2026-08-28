@@ -8,81 +8,117 @@
 #include "usart.h"
 #include <stdio.h>
 #include <string.h>
-
+#include "timer_evt.h"
 
 #define UART_RX_MAX_SIZE 64
 #define UART_TX_MAX_SIZE 64
 
-TransmissionStatus_t UART_Com_TransmitRawData(uint8_t *data, uint32_t size)
+typedef enum
 {
-	TransmissionStatus_t ret_val = TRANSMIT_FAILURE;
-	if(HAL_UART_Transmit(&hlpuart1, data, size, 100) == HAL_OK)
+	UART_COM_TX_UNINIT,
+	UART_COM_TX_IDLE,
+	UART_COM_TX_PROCESSING,
+}UART_TxComState_t;
+
+typedef enum
+{
+	UART_COM_RX_UNINIT,
+	UART_COM_RX_IDLE,
+	UART_COM_RX_PROCESSING,
+}UART_RxComState_t;
+
+volatile UART_TxComState_t UART_TxComState = UART_COM_TX_UNINIT;
+volatile UART_RxComState_t UART_RxComState = UART_COM_RX_UNINIT;
+
+static UartComSetEvent setEv;
+
+static void UART_ComTimeoutCallback(void);
+
+UartCommStatus_t UART_ComInit(UartComSetEvent UserSetEv)
+{
+	UartCommStatus_t ret_val = COMM_ERROR;
+	if(UserSetEv != NULL)
 	{
-		ret_val = TRANSMIT_OK;
+		if(EvtTimerInit(UART_ComTimeoutCallback) != EVT_TIMER_INVALID_ID)
+		{
+			ret_val = COMM_OK;
+			setEv = UserSetEv;
+			UART_TxComState = UART_COM_RX_IDLE;
+			UART_RxComState = UART_COM_RX_IDLE;
+		}
 	}
 	return ret_val;
 }
 
-TransmissionStatus_t UART_Com_TransmitRawDataNonBLocking(uint8_t *data, uint32_t size)
+static void UART_ComTimeoutCallback(void)
 {
-	TransmissionStatus_t ret_val = TRANSMIT_FAILURE;
-	if(HAL_UART_Transmit_IT(&hlpuart1, data, size) == HAL_OK)
+	if(UART_RxComState == UART_COM_RX_PROCESSING)
 	{
-		ret_val = TRANSMIT_OK;
+		setEv(COMM_EVT_RX_TIMEOUT);
+	}
+	if(UART_TxComState == UART_COM_TX_PROCESSING)
+	{
+		setEv(COMM_EVT_TX_TIMEOUT);
+	}
+	UART_TxComState = UART_COM_TX_IDLE;
+	UART_RxComState = UART_COM_RX_IDLE;
+}
+
+void UART_ComRxCallback(void)
+{
+	if(UART_RxComState == UART_COM_RX_PROCESSING)
+	{
+		UART_RxComState = UART_COM_RX_IDLE;
+		setEv(COMM_EVT_RX_COMPLETED);
+	}
+}
+
+void UART_ComTxCallback(void)
+{
+	if(UART_TxComState == UART_COM_TX_PROCESSING)
+	{
+		UART_TxComState = UART_COM_TX_IDLE;
+		setEv(COMM_EVT_TX_CONFIRMATION);
+	}
+}
+
+UartCommStatus_t UART_Com_TransmitRawData(uint8_t *data, uint32_t size)
+{
+	UartCommStatus_t ret_val = COMM_ERROR;
+	if(UART_TxComState == UART_COM_TX_IDLE)
+	{
+		if(HAL_UART_Transmit(&hlpuart1, data, size, 100) == HAL_OK)
+		{
+			ret_val = COMM_OK;
+		}
 	}
 	return ret_val;
 }
 
-TransmissionStatus_t UART_Com_TransmitData(int16_t Xdata, int16_t Ydata, int16_t Zdata)
+UartCommStatus_t UART_Com_TransmitRawDataNonBLocking(uint8_t *data, uint32_t size)
 {
-	TransmissionStatus_t ret_val = TRANSMIT_FAILURE;
-	uint8_t uart_data_out[UART_TX_MAX_SIZE];
-	int len_str = snprintf((char*)uart_data_out, UART_TX_MAX_SIZE, "OK, %3d, %3d, %3d\n\r", Xdata, Ydata, Zdata);
-	if( HAL_UART_Transmit(&hlpuart1, uart_data_out, len_str, 100) == HAL_OK)
+	UartCommStatus_t ret_val = COMM_ERROR;
+	if(UART_TxComState == UART_COM_TX_IDLE)
 	{
-		ret_val = TRANSMIT_OK;
+		if(HAL_UART_Transmit_IT(&hlpuart1, data, size) == HAL_OK)
+		{
+			UART_TxComState = UART_COM_TX_PROCESSING;
+			ret_val = COMM_OK;
+		}
 	}
 	return ret_val;
 }
 
-TransmissionStatus_t UART_Com_TransmitString(char *str)
+UartCommStatus_t UART_Com_ReceiveNonBlocking(uint8_t *data_out, uint8_t size)
 {
-	TransmissionStatus_t ret_val = TRANSMIT_FAILURE;
-	if( HAL_UART_Transmit(&hlpuart1, str, strlen(str), 100) == HAL_OK )
+	UartCommStatus_t ret_val = COMM_ERROR;
+	if(UART_RxComState == UART_COM_RX_IDLE)
 	{
-		ret_val = TRANSMIT_OK;
-	}
-	return ret_val;
-}
-
-TransmissionStatus_t UART_Com_TransmitStringNonBlocking(char *str)
-{
-	TransmissionStatus_t ret_val = TRANSMIT_FAILURE;
-	if( HAL_UART_Transmit_IT(&hlpuart1, str, strlen(str)) == HAL_OK )
-	{
-		ret_val = TRANSMIT_OK;
-	}
-	return ret_val;
-}
-
-ReceptionStatus_t UART_Com_ReceiveNonBlocking(uint8_t *bytes, uint8_t size)
-{
-	ReceptionStatus_t ret_val = RECEPTION_FAILURE;
-	if(HAL_UART_Receive_IT(&hlpuart1, bytes, size) == HAL_OK)
-	{
-		ret_val = RECPETION_OK;
-	}
-	return ret_val;
-}
-
-TransmissionStatus_t UART_Com_TransmitError(uint16_t ErrorCode)
-{
-	TransmissionStatus_t ret_val = TRANSMIT_FAILURE;
-	uint8_t uart_data_out[UART_TX_MAX_SIZE];
-	int len_str = snprintf((char*)uart_data_out, UART_TX_MAX_SIZE, "ERROR, %d\n", ErrorCode);
-	if(HAL_UART_Transmit(&hlpuart1, uart_data_out, len_str, 100) == HAL_OK)
-	{
-		ret_val = TRANSMIT_OK;
+		if(HAL_UART_Receive_IT(&hlpuart1, data_out, size) == HAL_OK)
+		{
+			UART_RxComState = UART_COM_RX_PROCESSING;
+			ret_val = COMM_OK;
+		}
 	}
 	return ret_val;
 }
@@ -93,52 +129,3 @@ uint8_t uart_read_byte(UART_HandleTypeDef *huart)
 	return huart->Instance->RDR;
 }
 
-ReceptionStatus_t UART_Com_GetBytesNonBlocking(char *data_out, uint16_t size)
-{
-	ReceptionStatus_t ret_val = RECEPTION_FAILURE;
-
-	HAL_StatusTypeDef hal_ret = HAL_UART_Receive_IT(&hlpuart1, data_out, size);
-	if( hal_ret == HAL_OK )
-	{
-		ret_val = RECPETION_OK;
-	}
-	return ret_val;
-}
-
-ReceptionStatus_t UART_Com_GetSize(uint16_t *size)
-{
-	uint8_t uart_data_in[2];
-	ReceptionStatus_t ret_val = RECEPTION_FAILURE;
-
-	HAL_StatusTypeDef hal_ret = HAL_UART_Receive(&hlpuart1, uart_data_in, 2, 2000);
-	if( hal_ret == HAL_OK )
-	{
-		*size = ((uint16_t)uart_data_in[0])<<8 | uart_data_in[1];
-		ret_val = RECPETION_OK;
-	}
-	return ret_val;
-}
-
-ReceptionStatus_t UART_Com_CheckStartSignal(uint8_t *sig_out)
-{
-	uint8_t uart_data_in;
-	ReceptionStatus_t ret_val = RECEPTION_FAILURE;
-	if(HAL_UART_Receive(&hlpuart1, &uart_data_in, 1, 10) == HAL_OK )
-	{
-		if(uart_data_in == START_SIGNAL)
-		{
-			*sig_out = START_SIGNAL;
-			ret_val = RECPETION_OK;
-		}
-		else if(uart_data_in == GET_CFG_SIGNAL)
-		{
-			*sig_out = GET_CFG_SIGNAL;
-			ret_val = RECPETION_OK;
-		}
-		else
-		{
-
-		}
-	}
-	return ret_val;
-}

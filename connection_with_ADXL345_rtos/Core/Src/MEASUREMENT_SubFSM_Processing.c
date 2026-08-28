@@ -4,7 +4,7 @@
  *  Created on: Jul 14, 2026
  *      Author: Karol
  */
-
+#if 0
 
 #include "MeasurementFSM.h"
 #include "MEASUREMENT_SubFSM_Processing.h"
@@ -165,3 +165,5 @@ static FSM_ret MeasurementProcessingDataSending_StateHandler (fsm_context *ctx, 
 	}
 	return ret_val;
 }
+
+#endif
