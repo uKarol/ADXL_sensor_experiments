@@ -53,7 +53,7 @@ UartCommStatus_t UART_ComInit(UartComSetEvent UserSetEv)
 		{
 			ret_val = COMM_OK;
 			setEv = UserSetEv;
-			UART_TxComState = UART_COM_RX_IDLE;
+			UART_TxComState = UART_COM_TX_IDLE;
 			UART_RxComState = UART_COM_RX_IDLE;
 		}
 	}

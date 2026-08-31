@@ -159,7 +159,7 @@ static FSM_ret CommGetType_StateHandler (fsm_context *ctx, FsmEvent_t *user_even
 			Fsm_StateTransition(ctx, CommGetLength_StateHandler);
 			break;
 
-		case COMM_EVT_TX_TIMEOUT:
+		case COMM_EVT_RX_TIMEOUT:
 			ret_val = FSM_ERROR;
 			break;
 
@@ -196,7 +196,7 @@ static FSM_ret CommGetLength_StateHandler (fsm_context *ctx, FsmEvent_t *user_ev
 			}
 			break;
 
-		case COMM_EVT_TX_TIMEOUT:
+		case COMM_EVT_RX_TIMEOUT:
 			ret_val = FSM_ERROR;
 			break;
 
@@ -225,7 +225,7 @@ static FSM_ret CommGetPayload_StateHandler (fsm_context *ctx, FsmEvent_t *user_e
 			Fsm_StateTransition(ctx, CommRxWaiting_StateHandler);
 			break;
 
-		case COMM_EVT_TX_TIMEOUT:
+		case COMM_EVT_RX_TIMEOUT:
 			ret_val = FSM_ERROR;
 			break;
 
@@ -246,7 +246,6 @@ static FSM_ret CommTransmittingData_StateHandler (fsm_context *ctx, FsmEvent_t *
 	switch(current_event)
 	{
 		case FSM_INITIAL_EVENT:
-			transmissionOngoing = true;
 			if( UART_Com_TransmitRawDataNonBLocking(context_data->raw_tx_data, context_data->tx_raw_length) != COMM_OK)
 			{
 				UpperLayerNot(UART_COM_ERROR_DURING_TX);
@@ -276,8 +275,9 @@ static FSM_ret CommTransmittingData_StateHandler (fsm_context *ctx, FsmEvent_t *
 UartCommStatus_t UartComSetFrame(uint8_t frame_type, uint16_t length, uint8_t *payload)
 {
 	UartCommStatus_t ret_val = COMM_ERROR;
-	if((length < MAX_TX_LENGTH) && (!transmissionOngoing))
+	if((length < MAX_TX_LENGTH - DEFAULT_FRAME_OVERHEAD) && (!transmissionOngoing))
 	{
+		transmissionOngoing = true;
 		CommunicationTxFSM_Data.tx_raw_length = DEFAULT_FRAME_OVERHEAD + length;
 		UartComPrepareFrame(frame_type, length, payload, CommunicationTxFSM_Data.raw_tx_data);
 		ret_val = COMM_OK;
