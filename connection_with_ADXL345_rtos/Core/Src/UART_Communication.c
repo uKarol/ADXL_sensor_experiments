@@ -13,6 +13,9 @@
 #define UART_RX_MAX_SIZE 64
 #define UART_TX_MAX_SIZE 64
 
+#define DEFAULT_RX_TIMEOUT 100
+#define DEFAULT_TX_TIMEOUT 100
+
 typedef enum
 {
 	UART_COM_TX_UNINIT,
@@ -32,14 +35,21 @@ volatile UART_RxComState_t UART_RxComState = UART_COM_RX_UNINIT;
 
 static UartComSetEvent setEv;
 
-static void UART_ComTimeoutCallback(void);
+uint8_t tx_timer_id;
+uint8_t rx_timer_id;
+
+
+static void UART_ComRxTimeoutCallback(void);
+static void UART_ComTxTimeoutCallback(void);
 
 UartCommStatus_t UART_ComInit(UartComSetEvent UserSetEv)
 {
 	UartCommStatus_t ret_val = COMM_ERROR;
 	if(UserSetEv != NULL)
 	{
-		if(EvtTimerInit(UART_ComTimeoutCallback) != EVT_TIMER_INVALID_ID)
+		tx_timer_id = EvtTimerInit(UART_ComTxTimeoutCallback);
+		rx_timer_id = EvtTimerInit(UART_ComRxTimeoutCallback);
+		if((rx_timer_id != EVT_TIMER_INVALID_ID) && (tx_timer_id != EVT_TIMER_INVALID_ID))
 		{
 			ret_val = COMM_OK;
 			setEv = UserSetEv;
@@ -50,26 +60,34 @@ UartCommStatus_t UART_ComInit(UartComSetEvent UserSetEv)
 	return ret_val;
 }
 
-static void UART_ComTimeoutCallback(void)
+static void UART_ComTxTimeoutCallback(void)
+{
+	if(UART_TxComState == UART_COM_TX_PROCESSING)
+	{
+		UART_TxComState = UART_COM_TX_IDLE;
+		setEv(COMM_EVT_TX_TIMEOUT);
+	}
+}
+
+
+static void UART_ComRxTimeoutCallback(void)
 {
 	if(UART_RxComState == UART_COM_RX_PROCESSING)
 	{
+		UART_RxComState = UART_COM_RX_IDLE;
 		setEv(COMM_EVT_RX_TIMEOUT);
 	}
-	if(UART_TxComState == UART_COM_TX_PROCESSING)
-	{
-		setEv(COMM_EVT_TX_TIMEOUT);
-	}
-	UART_TxComState = UART_COM_TX_IDLE;
-	UART_RxComState = UART_COM_RX_IDLE;
 }
 
 void UART_ComRxCallback(void)
 {
 	if(UART_RxComState == UART_COM_RX_PROCESSING)
 	{
-		UART_RxComState = UART_COM_RX_IDLE;
-		setEv(COMM_EVT_RX_COMPLETED);
+		if(EvtTimerStop(rx_timer_id) == EVT_TIMER_OK)
+		{
+			UART_RxComState = UART_COM_RX_IDLE;
+			setEv(COMM_EVT_RX_COMPLETED);
+		}
 	}
 }
 
@@ -77,8 +95,11 @@ void UART_ComTxCallback(void)
 {
 	if(UART_TxComState == UART_COM_TX_PROCESSING)
 	{
-		UART_TxComState = UART_COM_TX_IDLE;
-		setEv(COMM_EVT_TX_CONFIRMATION);
+		if(EvtTimerStop(tx_timer_id) == EVT_TIMER_OK)
+		{
+			UART_TxComState = UART_COM_TX_IDLE;
+			setEv(COMM_EVT_TX_CONFIRMATION);
+		}
 	}
 }
 
@@ -102,7 +123,24 @@ UartCommStatus_t UART_Com_TransmitRawDataNonBLocking(uint8_t *data, uint32_t siz
 	{
 		if(HAL_UART_Transmit_IT(&hlpuart1, data, size) == HAL_OK)
 		{
-			UART_TxComState = UART_COM_TX_PROCESSING;
+			if(EvtTimerStart(tx_timer_id, DEFAULT_TX_TIMEOUT) == EVT_TIMER_OK)
+			{
+				UART_TxComState = UART_COM_TX_PROCESSING;
+				ret_val = COMM_OK;
+			}
+		}
+	}
+	return ret_val;
+}
+
+UartCommStatus_t UART_Com_ReceiveNonBlockingNoTimeout(uint8_t *data_out, uint8_t size)
+{
+	UartCommStatus_t ret_val = COMM_ERROR;
+	if(UART_RxComState == UART_COM_RX_IDLE)
+	{
+		if(HAL_UART_Receive_IT(&hlpuart1, data_out, size) == HAL_OK)
+		{
+			UART_RxComState = UART_COM_RX_PROCESSING;
 			ret_val = COMM_OK;
 		}
 	}
@@ -116,8 +154,11 @@ UartCommStatus_t UART_Com_ReceiveNonBlocking(uint8_t *data_out, uint8_t size)
 	{
 		if(HAL_UART_Receive_IT(&hlpuart1, data_out, size) == HAL_OK)
 		{
-			UART_RxComState = UART_COM_RX_PROCESSING;
-			ret_val = COMM_OK;
+			if(EvtTimerStart(rx_timer_id, DEFAULT_TX_TIMEOUT) == EVT_TIMER_OK)
+			{
+				UART_RxComState = UART_COM_RX_PROCESSING;
+				ret_val = COMM_OK;
+			}
 		}
 	}
 	return ret_val;

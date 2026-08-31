@@ -64,5 +64,6 @@ UartCommStatus_t UART_ComInit(UartComSetEvent UserSetEv);
 UartCommStatus_t UART_Com_TransmitRawData(uint8_t *data, uint32_t size);
 UartCommStatus_t UART_Com_ReceiveNonBlocking(uint8_t *data_out, uint8_t size);
 UartCommStatus_t UART_Com_TransmitRawDataNonBLocking(uint8_t *data, uint32_t size);
+UartCommStatus_t UART_Com_ReceiveNonBlockingNoTimeout(uint8_t *data_out, uint8_t size);
 
 #endif /* INC_UART_COMMUNICATION_H_ */

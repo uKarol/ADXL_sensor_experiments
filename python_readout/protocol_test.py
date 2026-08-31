@@ -1,11 +1,24 @@
 import serial
+from typing import *
 
+COMMAND_MESSAGE = b'\x00'
+TEXT_MESSAGE = b'\x01'
+DATA_MESSAGE = b'\x02'
+ERROR_MESSAGE = b'\x03'
+UNKNOWN_MESSAGE = b'\x04'
+
+CMD_START_MEASUREMENT = b'\x00'
+CMD_STOP_MEASUREMENT = b'\x01'
+CMD_GET_SAMPLES = b'\x02'
+CMD_GET_DIAG = b'\x03'	   
+CMD_RESET = b'\x04'
+UNKNOWN_CMD = b'\x05'
 
 def receive_data(ser:serial.Serial):
     x = ser.read(1)
     if(x == b'\x55'):
         type = ser.read(1)
-        length = int.from_bytes(ser.read(2), byteorder="big")
+        length = int.from_bytes(ser.read(2), byteorder="little")
         print(length)
         data = ser.read(length)
         
@@ -20,6 +33,15 @@ def receive_data(ser:serial.Serial):
         else:
             print(type)
             print(data)
+
+
+def send_frame(type : bytes, length : int, payload : bytes):
+
+    len_field = length.to_bytes(2, "little")
+    message = b'\x55' + type + len_field + payload
+    print(message)
+
+#send_frame(COMMAND_MESSAGE, 1 , CMD_START_MEASUREMENT)
 
 
 with serial.Serial("COM5", 115200) as ser:

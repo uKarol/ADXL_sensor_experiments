@@ -208,7 +208,7 @@ measurement_error_t Measurement_Init(MeasurementInitStruct *init_data, measureme
 	return ret_val;
 }
 
-
+uint8_t errors;
 
 void Measurement_SetEvent(MeasurementEvt_t evt)
 {
@@ -222,7 +222,11 @@ void Measurement_SetEvent(MeasurementEvt_t evt)
 	}
 	else
 	{
-		xQueueSend(Measurement_EvtQueue, &user_event, 0);
+		if(pdPASS != xQueueSend(Measurement_EvtQueue, &user_event, 0))
+		{
+			errors++;
+		}
+
 	}
 }
 
