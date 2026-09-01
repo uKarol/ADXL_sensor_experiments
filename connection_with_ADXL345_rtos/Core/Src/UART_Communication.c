@@ -64,6 +64,7 @@ static void UART_ComTxTimeoutCallback(void)
 {
 	if(UART_TxComState == UART_COM_TX_PROCESSING)
 	{
+		HAL_UART_AbortTransmit_IT(&hlpuart1);
 		UART_TxComState = UART_COM_TX_IDLE;
 		setEv(COMM_EVT_TX_TIMEOUT);
 	}
@@ -74,6 +75,7 @@ static void UART_ComRxTimeoutCallback(void)
 {
 	if(UART_RxComState == UART_COM_RX_PROCESSING)
 	{
+		HAL_UART_AbortReceive_IT(&hlpuart1);
 		UART_RxComState = UART_COM_RX_IDLE;
 		setEv(COMM_EVT_RX_TIMEOUT);
 	}
@@ -154,7 +156,7 @@ UartCommStatus_t UART_Com_ReceiveNonBlocking(uint8_t *data_out, uint8_t size)
 	{
 		if(HAL_UART_Receive_IT(&hlpuart1, data_out, size) == HAL_OK)
 		{
-			if(EvtTimerStart(rx_timer_id, DEFAULT_TX_TIMEOUT) == EVT_TIMER_OK)
+			if(EvtTimerStart(rx_timer_id, DEFAULT_RX_TIMEOUT) == EVT_TIMER_OK)
 			{
 				UART_RxComState = UART_COM_RX_PROCESSING;
 				ret_val = COMM_OK;
