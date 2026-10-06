@@ -102,11 +102,11 @@
   :source:
     - src/**
     - ../../src/**
-    - ../../../my_state_machine_experiments/state_machine/**
+    - ../../../../my_state_machine_experiments/state_machine/**
   :include:
     - src/** # In simple projects, this entry often duplicates :source
     - ../../src/**
-    - ../../../my_state_machine_experiments/state_machine/**
+    - ../../../../my_state_machine_experiments/state_machine/**
   :support:
     - test/support
   :libraries: []
